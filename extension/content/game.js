@@ -567,7 +567,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       out.push(el);
     }
     for (let i = out.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [out[i], out[j]] = [out[j], out[i]]; }
-    return out.slice(0, 20);
+    return out.slice(0, 30);
   }
 
   function elementLabel(el) {
@@ -1812,16 +1812,12 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     const k = e.spawnT > 0 ? 1 - e.spawnT / 0.75 : 1;
     const col = e.kind === 'boss' ? (BOSS_COLORS[e.variant] || '#aa00ff') : e.kind === 'chaser' ? '#ff3d00' : PATTERN_COLORS[e.pattern] || '#e0157a';
     const warn = e.kind === 'shooter' && e.spawnT <= 0 && e.shots <= 0 && e.fireCd < 0.4;
-    const pulse = warn ? 1 : 0.55 + Math.sin(e.t * 6) * 0.25;
     ctx.save();
-    ctx.globalAlpha = k * pulse;
-    ctx.strokeStyle = col;
-    ctx.lineWidth = e.kind === 'boss' || warn ? 4 : 2;
-    ctx.setLineDash([6, 4]);
-    ctx.lineDashOffset = -e.t * 30;
-    const pad = 4 + (1 - k) * 20;
-    ctx.strokeRect(Math.round(e.x - e.hw - pad) + 0.5, Math.round(e.y - e.hh - pad) + 0.5, Math.round(e.hw * 2 + pad * 2), Math.round(e.hh * 2 + pad * 2));
-    ctx.setLineDash([]);
+    if (warn) {
+      ctx.globalAlpha = 0.22 * k;
+      ctx.fillStyle = col;
+      ctx.fillRect(e.x - e.hw, e.y - e.hh, e.hw * 2, e.hh * 2);
+    }
     if (e.hitFlash > 0) {
       ctx.globalAlpha = 0.35;
       ctx.fillStyle = '#ffd740';
@@ -1829,17 +1825,18 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     }
     ctx.restore();
     if (e.spawnT > 0) return;
-    if (e.crowd && e.kind !== 'boss' && e.hp >= e.maxHp) return;
-    const fs = e.kind === 'boss' ? 10 : 8;
-    const label = e.kind === 'boss' ? `BOSS ${e.name}` : e.name;
-    ctx.font = `${fs}px CCSilk, monospace`;
-    const tw = Math.ceil(ctx.measureText(label).width) + 6;
-    const ty = Math.round(e.y - e.hh - 12);
-    ctx.fillStyle = e.kind === 'boss' ? TAG_COLORS.boss : col;
-    ctx.globalAlpha = 0.85;
-    ctx.fillRect(Math.round(e.x - tw / 2), ty - fs / 2 - 2, tw, fs + 3);
-    ctx.globalAlpha = 1;
-    text(label, Math.round(e.x), ty, fs, '#fff');
+    if (e.kind === 'boss') {
+      const fs = 10;
+      const label = `BOSS ${e.name}`;
+      ctx.font = `${fs}px CCSilk, monospace`;
+      const tw = Math.ceil(ctx.measureText(label).width) + 6;
+      const ty = Math.round(e.y - e.hh - 12);
+      ctx.fillStyle = TAG_COLORS.boss;
+      ctx.globalAlpha = 0.85;
+      ctx.fillRect(Math.round(e.x - tw / 2), ty - fs / 2 - 2, tw, fs + 3);
+      ctx.globalAlpha = 1;
+      text(label, Math.round(e.x), ty, fs, '#fff');
+    }
     if (e.hp < e.maxHp) {
       const bw = Math.max(30, Math.min(140, e.hw * 2));
       const by = Math.round(e.y + e.hh + 6);
@@ -2425,7 +2422,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && getComputedStyle(document.documentElement).colorScheme.includes('dark'));
   }
 
-  const DIFF_MAX = { easy: 5, medium: 10, hard: 20 };
+  const DIFF_MAX = { easy: 5, medium: 10, hard: 30 };
   let difficulty = 'medium';
 
   function start(opts) {
