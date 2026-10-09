@@ -10,7 +10,7 @@
   const host = document.createElement('div');
   host.id = 'cookie-crusher-host';
   host.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483647;display:block;';
-  const root = host.attachShadow({ mode: 'open' });
+  const root = host.attachShadow({ mode: 'closed' });
   root.innerHTML = `
     <style>
       :host { all: initial; }
@@ -755,6 +755,7 @@
 
   function startWave() {
     if (state !== 'idle') return;
+    if (hasChrome) { try { chrome.runtime.sendMessage({ cc: 'wave', wave }).catch(() => {}); } catch (e) { /* ignore */ } }
     waveInfo = waveParams(wave);
     const q = [];
     for (let i = 0; i < waveInfo.count; i++) {
@@ -1899,7 +1900,11 @@
   async function loadFont() {
     if (!hasChrome) return;
     try {
-      const buf = await (await fetch(chrome.runtime.getURL('fonts/Silkscreen-Regular.ttf'))).arrayBuffer();
+      const url = await chrome.runtime.sendMessage({ cc: 'font' });
+      if (!url) return;
+      const bin = atob(url.slice(url.indexOf(',') + 1));
+      const buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
       const face = new FontFace('CCSilk', buf);
       await face.load();
       document.fonts.add(face);

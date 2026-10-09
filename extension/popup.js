@@ -25,7 +25,13 @@ async function inject() {
   await chrome.scripting.executeScript({ target: { tabId }, files: ['content/cookies.js', 'content/game.js'] });
 }
 
+async function showBest() {
+  const { bestWave } = await chrome.storage.local.get('bestWave');
+  $('best').textContent = bestWave ? `Best: wave ${bestWave}` : '';
+}
+
 async function refresh() {
+  showBest();
   if (blocked) return show(null, blocked);
   show(await send({ cc: 'status' }));
 }
