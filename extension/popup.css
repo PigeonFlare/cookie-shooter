@@ -18,5 +18,16 @@ button:hover { border-color: #6d89b8; background: linear-gradient(#fff, #f2f6fc 
 button.primary { font-weight: bold; }
 button[hidden] { display: none; }
 label { display: block; margin-bottom: 6px; }
+#diff { display: flex; margin: 0 0 8px; border: 1px solid #999; border-radius: 2px; overflow: hidden; }
+#diff[hidden] { display: none; }
+#diff label { flex: 1; margin: 0; }
+#diff input { position: absolute; opacity: 0; pointer-events: none; }
+#diff span { display: block; text-align: center; padding: 4px 0; cursor: pointer; background: linear-gradient(#fdfdfd, #ececec 50%, #ddd); border-left: 1px solid #bbb; }
+#diff label:first-child span { border-left: 0; }
+#diff input:checked + span { color: #fff; font-weight: bold; background: linear-gradient(#4f86f7, #1851ce); }
+#diff input:focus-visible + span { outline: 2px solid #0b3a99; outline-offset: -2px; }
+#clist li span.easy { color: #2e7d32; }
+#clist li span.medium { color: #e65100; }
+#clist li span.hard { color: #c62828; font-weight: bold; }
 .help { margin: 0; color: #777; font-size: 11px; }
 button:disabled { color: #999; cursor: default; border-color: #bbb; background: #eee; }

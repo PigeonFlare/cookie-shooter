@@ -26,7 +26,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     chrome.storage.local.get('conquered').then(({ conquered = {} }) => {
       const now = Date.now();
       const cur = conquered[host] || { first: now, count: 0 };
-      conquered[host] = { first: cur.first, count: cur.count + 1, last: now };
+      const rank = ['easy', 'medium', 'hard'].indexOf(msg.difficulty);
+      conquered[host] = { first: cur.first, count: (cur.count || 0) + 1, last: now, best: Math.max(cur.best ?? -1, rank) };
       chrome.storage.local.set({ conquered });
     });
   }

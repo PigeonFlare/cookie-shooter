@@ -902,12 +902,12 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       SND.clear();
       score += 500;
       const site = location.hostname.replace(/^www\./, '') || 'local file';
-      if (hasChrome) { try { chrome.runtime.sendMessage({ cc: 'conquered', host: site }).catch(() => {}); } catch {} }
+      if (hasChrome) { try { chrome.runtime.sendMessage({ cc: 'conquered', host: site, difficulty }).catch(() => {}); } catch {} }
       floaters.push({ x: W / 2, y: H * 0.35, text: `${site.toUpperCase()} CONQUERED  +500`, color: '#1f8a17', life: 2.4, max: 2.4, big: true });
       updateBadge();
       setTimeout(() => {
         if (state !== 'idle' || !running) return;
-        showPanel(`${site} conquered`, `You took apart every element on the page with ${Math.ceil(player.hp)} HP left. Score ${score.toLocaleString()}.`, [
+        showPanel(`${site} conquered`, `You beat it on ${difficulty}, taking apart every element on the page with ${Math.ceil(player.hp)} HP left. Score ${score.toLocaleString()}.`, [
           { label: 'Play again', primary: true, onClick: () => { resetGame(); startWave(); } },
           { label: 'End attack', onClick: end }
         ], 'End attack puts the page back');
@@ -2303,14 +2303,18 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && getComputedStyle(document.documentElement).colorScheme.includes('dark'));
   }
 
+  const DIFF_MAX = { easy: 5, medium: 10, hard: 20 };
+  let difficulty = 'medium';
+
   function start(opts) {
     if (running) return status();
     if (opts && typeof opts.sound === 'boolean') prefs.sound = opts.sound;
     mode = opts && opts.mode === 'elements' ? 'elements' : 'cookies';
+    if (opts && DIFF_MAX[opts.difficulty]) difficulty = opts.difficulty;
     pageDark = isPageDark();
     elementSpecs = [];
     if (mode === 'elements') {
-      const els = detectEnemyElements();
+      const els = detectEnemyElements().slice(0, DIFF_MAX[difficulty]);
       if (els.length) {
         let bossEl = null;
         bossEl = els.reduce((a, b) => { const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(); return rb.width * rb.height > ra.width * ra.height ? b : a; });
