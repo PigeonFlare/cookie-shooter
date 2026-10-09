@@ -633,6 +633,7 @@
   function hurtPlayer(dmg, srcX, srcY, ignoreInv) {
     if (state !== 'wave') return;
     if (player.inv > 0 && !ignoreInv) return;
+    dmg = clamp(dmg, 12, 25);
     player.hp -= dmg;
     player.inv = ignoreInv ? Math.max(player.inv, 0.15) : 0.7;
     shake = Math.min(12, shake + 4 + dmg * 0.3);
@@ -813,11 +814,11 @@
       if (state === 'wave') {
         const dmg = BASE.damage * dmgMultFor(stacks.dmg) * 1.8;
         for (const e of enemies) {
-          if (e.dead || e.spawnT > 0 || e.ghost || e.kind === 'necessary' || p.dashHits.has(e)) continue;
+          if (e.dead || e.spawnT > 0 || e.ghost || p.dashHits.has(e)) continue;
           if (hyp(e.x - p.x, e.y - p.y) < e.r + p.r + 6) {
             p.dashHits.add(e);
             const d = hyp(p.dashVx, p.dashVy) || 1;
-            damageEnemy(e, dmg, p.dashVx / d * 260, p.dashVy / d * 260, 0);
+            damageEnemy(e, dmg, p.dashVx / d * 260, p.dashVy / d * 260, 0.6);
             floaters.push({ x: e.x, y: e.y - 24, text: 'DASH HIT', color: '#1851ce', life: 0.6, max: 0.6 });
           }
         }
@@ -951,7 +952,10 @@
       e.phaseT = 3.4;
       e.laserStage = 0;
       const aim = Math.atan2(player.y - e.y, player.x - e.x);
-      for (let i = -2; i <= 2; i++) fireLaser(e, aim + i * 0.42, e.dmg * 2.4, '#aa00ff', 20);
+      for (let i = -1; i <= 1; i++) {
+        fireLaser(e, aim + i * 0.42, e.dmg * 2.4, '#aa00ff', 20);
+        fireLaser(e, aim + Math.PI + i * 0.42, e.dmg * 2.4, '#aa00ff', 20);
+      }
     }
     else if (next === 'teleport') { e.phaseT = 1.3; e.fadeT = 0.45; sfx(300, 0.3, 'triangle', 0.05, 900); }
     else if (next === 'summon') {
@@ -972,14 +976,14 @@
     const fr = waveInfo.fireRate;
     switch (e.pattern) {
       case 'aimed':
-        enemyShoot(e, aim + rand(-0.1, 0.1), sp() * 1.15, e.dmg, col);
+        enemyShoot(e, aim + rand(-0.1, 0.1), sp() * 1.15, e.dmg, col, { lead: true });
         e.shots = 1 + Math.min(2, Math.floor(wave / 4)); e.shotT = 0.18; e.burstAim = true;
         e.fireCd = rand(1.3, 1.9) / fr;
         break;
       case 'spread': {
         const n = 3 + Math.min(4, Math.floor(wave / 3)) * 1;
         const s = sp();
-        for (let i = 0; i < n; i++) enemyShoot(e, aim + (i - (n - 1) / 2) * 0.2, s, e.dmg, col);
+        for (let i = 0; i < n; i++) enemyShoot(e, aim + (i - (n - 1) / 2) * 0.2, s, e.dmg, col, { lead: true });
         e.fireCd = rand(1.7, 2.3) / fr;
         break;
       }
@@ -996,7 +1000,7 @@
         break;
       case 'wave': {
         const s = sp();
-        for (let i = -1; i <= 1; i++) enemyShoot(e, aim + i * 0.3, s, e.dmg, col, { wob: 45, wf: 7 });
+        for (let i = -1; i <= 1; i++) enemyShoot(e, aim + i * 0.3, s, e.dmg, col, { wob: 45, wf: 7, lead: true });
         e.fireCd = rand(1.6, 2.1) / fr;
         break;
       }
@@ -1006,7 +1010,8 @@
         break;
       case 'laser':
         fireLaser(e, aim, e.dmg * 2.2, col, 14);
-        if (wave >= 8) { fireLaser(e, aim + 0.5, e.dmg * 2.2, col, 14); fireLaser(e, aim - 0.5, e.dmg * 2.2, col, 14); }
+        fireLaser(e, aim + Math.PI, e.dmg * 2.2, col, 14);
+        if (wave >= 8) { fireLaser(e, aim + Math.PI / 2, e.dmg * 2.2, col, 14); fireLaser(e, aim - Math.PI / 2, e.dmg * 2.2, col, 14); }
         e.fireCd = rand(3.6, 4.4) / fr;
         return;
     }
@@ -1020,7 +1025,7 @@
     e.shots--;
     const col = PATTERN_COLORS[e.pattern];
     if (e.burstAim) {
-      enemyShoot(e, aim + rand(-0.15, 0.15), e.bulletSpeed * rand(1, 1.3), e.dmg, col);
+      enemyShoot(e, aim + rand(-0.15, 0.15), e.bulletSpeed * rand(1, 1.3), e.dmg, col, { lead: true });
       e.shotT = 0.09;
     } else {
       e.spinA += 0.42;
@@ -1031,8 +1036,32 @@
     if (e.shots % 3 === 0) SND.enemyShot();
   }
 
+  function leadAim(e, speed) {
+    const p = player;
+    const vx = p.dashT > 0 ? 0 : p.vx, vy = p.dashT > 0 ? 0 : p.vy;
+    const dx = p.x - e.x, dy = p.y - e.y;
+    const a = vx * vx + vy * vy - speed * speed, b = 2 * (dx * vx + dy * vy), c = dx * dx + dy * dy;
+    let t;
+    if (Math.abs(a) < 1e-6) {
+      t = b !== 0 ? -c / b : -1;
+    } else {
+      const disc = b * b - 4 * a * c;
+      if (disc < 0) return Math.atan2(dy, dx);
+      const r = Math.sqrt(disc), t1 = (-b - r) / (2 * a), t2 = (-b + r) / (2 * a);
+      t = Math.min(t1, t2) > 0 ? Math.min(t1, t2) : Math.max(t1, t2);
+    }
+    if (!(t > 0)) return Math.atan2(dy, dx);
+    t = Math.min(t, 2.5);
+    return Math.atan2(dy + vy * t, dx + vx * t);
+  }
+
   function enemyShoot(e, angle, speed, dmg, color, extra) {
     speed = Math.max(speed, BASE.speed * rand(1.12, 1.3));
+    if (extra && extra.lead) {
+      angle += leadAim(e, speed) - Math.atan2(player.y - e.y, player.x - e.x);
+      extra = Object.assign({}, extra);
+      delete extra.lead;
+    }
     bullets.push(Object.assign({
       x: e.x + Math.cos(angle) * e.r, y: e.y + Math.sin(angle) * e.r,
       vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
@@ -1103,18 +1132,22 @@
         shooterStream(e, dt, aim);
         e.phaseT -= dt * rage;
         if (e.phaseT <= 0) bossNextPhase(e);
+        e.fireCd -= dt * rage;
+        if (e.fireCd <= 0 && !e.ghost) {
+          e.fireCd = (e.phase === 'orbit' ? 1.0 : 1.6) / waveInfo.fireRate;
+          const sp = 260 * rand(0.9, 1.1);
+          const lead = leadAim(e, sp) - aim;
+          for (let m = 0; m < 4; m++) {
+            for (let i = -1; i <= 1; i++) enemyShoot(e, aim + lead + m * Math.PI / 2 + i * 0.14, sp, e.dmg, '#aa00ff');
+          }
+          SND.enemyShot();
+        }
         steer = 2;
         if (e.phase === 'orbit') {
           e.orbitA += dt * 0.75 * e.orbitDir * rage;
           const ox = p.x - Math.cos(e.orbitA) * 260 - e.x, oy = p.y - Math.sin(e.orbitA) * 260 - e.y, od = hyp(ox, oy) || 1;
           const sp = Math.min(e.speed * 5, od * 2.5);
           tvx = ox / od * sp; tvy = oy / od * sp;
-          e.fireCd -= dt * rage;
-          if (e.fireCd <= 0) {
-            e.fireCd = 1.0 / waveInfo.fireRate;
-            for (let i = -2; i <= 2; i++) enemyShoot(e, aim + i * 0.16, 200 * rand(0.9, 1.1), e.dmg, '#aa00ff');
-            SND.enemyShot();
-          }
         } else if (e.phase === 'charge') {
           if (e.windup > 0) {
             e.windup -= dt * rage;
@@ -1158,7 +1191,7 @@
           tvx = 0; tvy = 0; steer = 4;
           if (e.laserStage === 0 && e.phaseT < 2.2) {
             e.laserStage = 1;
-            const off = rand(0, Math.PI / 4);
+            const off = Math.atan2(player.y - e.y, player.x - e.x);
             for (let i = 0; i < 4; i++) fireLaser(e, off + i * Math.PI / 2, e.dmg * 2.4, '#d500f9', 20);
           }
         } else if (e.phase === 'summon') {
