@@ -8,12 +8,16 @@
   <h1>Cookie Shooter</h1>
   <p id="msg">Loading...</p>
   <div class="btns">
-    <button id="start" class="primary" title="Cookies attack in waves">Start attack</button>
-    <button id="page" title="The page's own elements attack you">Page attack</button>
+    <button id="start" class="primary" title="The page's own elements attack you">Start attack</button>
     <button id="next" hidden>Next wave</button>
     <button id="end" hidden>End attack</button>
-    <span id="best"></span>
   </div>
+  <details id="conq">
+    <summary>Sites conquered: <b id="ccount">0</b></summary>
+    <ul id="clist"></ul>
+    <button id="cclear" class="link">Clear list</button>
+  </details>
+  <button id="cookies" class="link" title="The original endless cookie waves">Play cookie waves instead</button>
   <label><input type="checkbox" id="sound" checked> Sound</label>
   <p class="help">WASD move, mouse aim, click attack, 1-3 weapons, Esc pause.</p>
   <script src="popup.js"></script>

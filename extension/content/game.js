@@ -885,7 +885,6 @@
 
   function startWave() {
     if (state !== 'idle') return;
-    if (hasChrome) { try { chrome.runtime.sendMessage({ cc: 'wave', wave }).catch(() => {}); } catch (e) { /* ignore */ } }
     waveInfo = waveParams(wave);
     if (mode === 'elements') {
       restoreElements();
@@ -942,11 +941,13 @@
       bullets = bullets.filter(b => b.from === 'player');
       SND.clear();
       score += 500;
-      floaters.push({ x: W / 2, y: H * 0.35, text: 'PAGE CLEARED  +500', color: '#1f8a17', life: 2.4, max: 2.4, big: true });
+      const site = location.hostname.replace(/^www\./, '') || 'local file';
+      if (hasChrome) { try { chrome.runtime.sendMessage({ cc: 'conquered', host: site }).catch(() => {}); } catch (e) { /* ignore */ } }
+      floaters.push({ x: W / 2, y: H * 0.35, text: `${site.toUpperCase()} CONQUERED  +500`, color: '#1f8a17', life: 2.4, max: 2.4, big: true });
       updateBadge();
       setTimeout(() => {
         if (state !== 'idle' || !running) return;
-        showPanel('Page cleared', `You took apart every element on the page with ${Math.ceil(player.hp)} HP left. Score ${score.toLocaleString()}.`, [
+        showPanel(`${site} conquered`, `You took apart every element on the page with ${Math.ceil(player.hp)} HP left. Score ${score.toLocaleString()}.`, [
           { label: 'Play again', primary: true, onClick: () => { resetGame(); startWave(); } },
           { label: 'End attack', onClick: end }
         ], 'End attack puts the page back');

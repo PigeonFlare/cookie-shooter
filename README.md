@@ -46,16 +46,14 @@ To install it:
 2. Open `chrome://extensions` and turn on **Developer mode**.
 3. Click **Load unpacked** and pick the `extension` folder.
 
-Then open any page, click the cookie icon in the toolbar and press **Start attack**. Or press **Page attack** for a single level where the page itself comes after you: its smaller buttons, links, images and boxes lift off the page, chase you down and shoot. The more of them there are, the slower each one fires, so busy pages stay beatable, and a page with only a handful of elements gets one boss element. Open the popup again at any time and press **End attack** to put the page back exactly how it was. Chrome doesn't let extensions run on its own pages (`chrome://`, the Web Store), so those can't be attacked.
-
-Your best wave is shown next to **Start attack** and kept in the extension's local storage.
+Then open any page, click the cookie icon in the toolbar and press **Start attack**. It's a single level where the page itself comes after you: its smaller buttons, links, images and boxes lift off the page, chase you down and shoot. The more of them there are, the slower each one fires, so busy pages stay beatable, and a page with only a handful of elements gets one boss element. Clear every element to conquer the site. The popup counts the sites you've conquered and expands into a list of them. The original endless cookie waves are still there under **Play cookie waves instead**. Open the popup again at any time and press **End attack** to put the page back exactly how it was. Chrome doesn't let extensions run on its own pages (`chrome://`, the Web Store), so those can't be attacked.
 
 ### Privacy and safety
 
-The extension runs entirely on your computer. It makes no network requests and has no analytics, and its only stored data is your best wave and the sound setting. It asks for three permissions:
+The extension runs entirely on your computer. It makes no network requests and has no analytics, and its only stored data is the list of sites you've conquered and the sound setting. You can wipe the list from the popup. It asks for three permissions:
 
 - `activeTab` and `scripting` let it run on the tab you clicked it on, and only when you click **Start attack**. It can't read or touch any other tab or run in the background.
-- `storage` saves your best wave and the sound setting.
+- `storage` saves your conquered sites and the sound setting.
 
 The game draws in a sealed overlay that the page's own scripts can't reach. It never reads cookies, form contents or anything you've typed. "Cookies" in the game are names from a built-in list. It hides broken page elements only while you play and puts them back when you press **End attack**.
 

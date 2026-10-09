@@ -20,11 +20,14 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg.cc === 'badge') {
     chrome.action.setBadgeText({ tabId: sender.tab.id, text: String(msg.text || '').slice(0, 4) });
     chrome.action.setBadgeBackgroundColor({ tabId: sender.tab.id, color: '#c62828' });
-  } else if (msg.cc === 'wave') {
-    const wave = Math.floor(Number(msg.wave));
-    if (!(wave > 0 && wave < 10000)) return;
-    chrome.storage.local.get('bestWave').then(({ bestWave }) => {
-      if (!(bestWave >= wave)) chrome.storage.local.set({ bestWave: wave });
+  } else if (msg.cc === 'conquered') {
+    const host = String(msg.host || '').toLowerCase().slice(0, 253);
+    if (!/^[a-z0-9.\-:\[\] ]+$/.test(host)) return;
+    chrome.storage.local.get('conquered').then(({ conquered = {} }) => {
+      const now = Date.now();
+      const cur = conquered[host] || { first: now, count: 0 };
+      conquered[host] = { first: cur.first, count: cur.count + 1, last: now };
+      chrome.storage.local.set({ conquered });
     });
   }
 });

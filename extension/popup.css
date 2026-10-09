@@ -4,7 +4,15 @@ h1 { margin: 0 0 6px; font: 14px Silk, monospace; color: #1851ce; }
 #msg { margin: 0 0 8px; min-height: 2.8em; }
 #msg.bad { color: #c62828; }
 .btns { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
-#best { margin-left: auto; font: 9px Silk, monospace; color: #555; }
+#conq { margin: 0 0 8px; border: 1px solid #c9d4e6; border-radius: 3px; background: #fff; padding: 4px 6px; }
+#conq summary { cursor: pointer; font-weight: bold; color: #1851ce; }
+#clist { list-style: none; margin: 6px 0 4px; padding: 0; max-height: 130px; overflow-y: auto; }
+#clist li { display: flex; justify-content: space-between; gap: 6px; padding: 2px 0; border-top: 1px dotted #dde4f0; }
+#clist li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#clist li span:last-child { color: #777; }
+#clist .none { color: #777; border: 0; }
+button.link { border: 0; background: none; padding: 0; color: #1851ce; text-decoration: underline; font-size: 11px; cursor: pointer; margin-bottom: 6px; }
+button.link:hover { background: none; color: #0b3a99; }
 button { font: 12px Tahoma, Verdana, sans-serif; padding: 5px 10px; color: #000; background: linear-gradient(#fdfdfd, #ececec 50%, #ddd); border: 1px solid #999; border-radius: 2px; cursor: pointer; }
 button:hover { border-color: #6d89b8; background: linear-gradient(#fff, #f2f6fc 50%, #dfe8f6); }
 button.primary { font-weight: bold; }
