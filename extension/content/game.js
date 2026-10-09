@@ -520,8 +520,26 @@
       inner.forEach(o => dropped.add(o.el));
       keep.push(c);
     }
-    keep.sort((a, b) => b.r.width * b.r.height - a.r.width * a.r.height);
-    return keep.slice(0, 60).map(c => c.el);
+    const out = [];
+    for (const c of keep) {
+      const el = promoteToBox(c.el, c.r, vw, vh);
+      if (!out.some(o => o === el || o.contains(el) || el.contains(o))) out.push(el);
+    }
+    return out.slice(0, 60);
+  }
+
+  function promoteToBox(el, r, vw, vh) {
+    const search = isSearchBar(el);
+    let best = el;
+    let cur = el.parentElement;
+    for (let i = 0; i < 6 && cur && cur !== document.body && cur !== document.documentElement; i++, cur = cur.parentElement) {
+      const pr = cur.getBoundingClientRect();
+      if (pr.width > r.width * 1.8 + 80 || pr.height > r.height * 2.6 + 40) break;
+      if (pr.height > vh / 3 || (pr.width > vw / 3 && !search)) break;
+      if (cur.querySelectorAll(CONTROL_SEL).length > 4) break;
+      if (looksLikeBox(getComputedStyle(cur))) best = cur;
+    }
+    return best;
   }
 
   function obstacleEls() {
