@@ -955,7 +955,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
 
   function spawnElement(spec) {
     const el = spec.el, r = el.getBoundingClientRect();
-    const nerf = spec.kind === 'shooter' ? Math.max(1, spec.shooters / 3) : 1;
+    const nerf = spec.kind === 'shooter' ? Math.max(1, spec.shooters / 4) : spec.kind === 'boss' ? Math.max(1, spec.count / 8) : 1;
     const hw = r.width / 2, hh = r.height / 2;
     const boss = spec.kind === 'boss';
     const e = {
@@ -965,13 +965,13 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       shots: 0, shotT: 0, spinA: rand(0, 6.3), orbitA: rand(0, 6.3), orbitDir: Math.random() < 0.5 ? 1 : -1
     };
     if (boss) {
-      Object.assign(e, { hp: 450, speed: 60, dmg: 13, touch: 30, bulletSpeed: 150, phase: 'orbit', phaseT: 3, windup: 0, chargesLeft: 0, fadeT: 0, trailT: 0,
+      Object.assign(e, { hp: 500, speed: 80, dmg: 13, touch: 30, bulletSpeed: 150, phase: 'orbit', phaseT: 3, windup: 0, chargesLeft: 0, fadeT: 0, trailT: 0,
         variant: pick(BOSS_VARIANTS), fireCd: 1.5 });
     } else if (spec.kind === 'chaser') {
-      Object.assign(e, { hp: clamp(Math.sqrt(r.width * r.height) * 0.8, 25, 110), speed: BASE.speed * rand(0.6, 0.85), dmg: 15, touch: 16 });
+      Object.assign(e, { hp: clamp(Math.sqrt(r.width * r.height) * 0.8, 25, 110), speed: BASE.speed * rand(0.75, 0.95), dmg: 18, touch: 18 });
     } else {
-      Object.assign(e, { hp: clamp(Math.sqrt(r.width * r.height) * 0.9, 30, 130), speed: BASE.speed * rand(0.45, 0.7), dmg: 10, touch: 14,
-        keep: rand(220, 320), pattern: pick(PATTERNS).id, bulletSpeed: BASE.speed * rand(1.2, 1.5), fireCd: rand(1.5, 4) });
+      Object.assign(e, { hp: clamp(Math.sqrt(r.width * r.height) * 0.9, 30, 130), speed: BASE.speed * rand(0.55, 0.8), dmg: 11, touch: 16,
+        keep: rand(220, 320), pattern: pick(PATTERNS).id, bulletSpeed: BASE.speed * rand(1.3, 1.7), fireCd: rand(1, 3) });
     }
     e.aimLead = Math.random() < 0.5;
     e.crowd = spec.count > 12;
@@ -1025,9 +1025,9 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
   function hurtPlayer(dmg, srcX, srcY, ignoreInv) {
     if (state !== 'wave') return;
     if (player.inv > 0 && !ignoreInv) return;
-    dmg = clamp(dmg, mode === 'elements' ? 8 : 12, 25);
+    dmg = clamp(dmg, mode === 'elements' ? 10 : 12, 25);
     player.hp -= dmg;
-    player.inv = ignoreInv ? Math.max(player.inv, 0.15) : mode === 'elements' ? 1 : 0.7;
+    player.inv = ignoreInv ? Math.max(player.inv, 0.15) : mode === 'elements' ? 0.85 : 0.7;
     shake = Math.min(14, shake + 5 + dmg * 0.3);
     flashRed = 0.35;
     rings.push({ x: player.x, y: player.y, r: 8, rmax: 70, color: '#ff1744', life: 0.3, max: 0.3, w: 4 });
@@ -1091,7 +1091,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     if (e.kind === 'boss') {
       shake = 22;
       for (let i = 0; i < 3; i++) dropPowerup(e.x + rand(-40, 40), e.y + rand(-30, 30));
-    } else if (Math.random() < (mode === 'elements' ? 0.25 : 0.1)) {
+    } else if (Math.random() < (mode === 'elements' ? 0.18 : 0.1)) {
       dropPowerup(e.x, e.y);
     }
   }
@@ -1425,7 +1425,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
         sfx(320, 0.12, 'square', 0.04, -180);
         return;
       case 'laser':
-        if (mode === 'elements' && lasers.filter(lz => lz.owner.kind === 'shooter').length >= 2) {
+        if (mode === 'elements' && lasers.filter(lz => lz.owner.kind === 'shooter').length >= 3) {
           enemyShoot(e, aim, e.bulletSpeed, e.dmg * 1.5, col, { lead: e.aimLead, r: 8 });
           e.fireCd = rand(1.4, 1.8) / fr;
           return;
@@ -1602,7 +1602,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       }
 
       if (e.kind !== 'necessary' && !e.ghost && d < e.r + p.r && e.contactCd <= 0) {
-        e.contactCd = mode === 'elements' ? 1.2 : 0.8;
+        e.contactCd = mode === 'elements' ? 1 : 0.8;
         hurtPlayer(e.touch, e.x, e.y);
         e.vx -= nx * 200; e.vy -= ny * 200;
       } else if (e.kind === 'necessary' && d < e.r + p.r) {
@@ -2313,7 +2313,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       const els = detectEnemyElements();
       if (els.length) {
         let bossEl = null;
-        if (els.length <= 6) bossEl = els.reduce((a, b) => { const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(); return rb.width * rb.height > ra.width * ra.height ? b : a; });
+        bossEl = els.reduce((a, b) => { const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(); return rb.width * rb.height > ra.width * ra.height ? b : a; });
         const rest = els.filter(el => el !== bossEl);
         const melee = Math.min(Math.max(2, Math.round(rest.length * 0.1)), rest.length >= 3 ? rest.length - 1 : rest.length);
         const order = rest.map((_, i) => i).sort(() => Math.random() - 0.5);
