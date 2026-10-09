@@ -46,7 +46,7 @@ To install it:
 2. Open `chrome://extensions` and turn on **Developer mode**.
 3. Click **Load unpacked** and pick the `extension` folder.
 
-Then open any page, click the cookie icon in the toolbar and press **Start attack**. Open the popup again at any time and press **End attack** to put the page back exactly how it was. Chrome doesn't let extensions run on its own pages (`chrome://`, the Web Store), so those can't be attacked.
+Then open any page, click the cookie icon in the toolbar and press **Start attack**. Or press **Page attack** for a single level where the page itself comes after you: its smaller buttons, links, images and boxes lift off the page, chase you down and shoot. The more of them there are, the slower each one fires, so busy pages stay beatable, and a page with only a handful of elements gets one boss element. Open the popup again at any time and press **End attack** to put the page back exactly how it was. Chrome doesn't let extensions run on its own pages (`chrome://`, the Web Store), so those can't be attacked.
 
 Your best wave is shown next to **Start attack** and kept in the extension's local storage.
 

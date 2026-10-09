@@ -5,15 +5,18 @@ const BLOCKED_MSG = 'This page can\'t be attacked. Chrome blocks extensions on i
 
 function show(st, err) {
   $('start').disabled = !!err;
+  $('page').disabled = !!err;
   const running = st && st.running;
   $('start').hidden = !!running;
+  $('page').hidden = !!running;
   $('end').hidden = !running;
-  $('next').hidden = !(running && st.state === 'idle');
+  $('next').hidden = !(running && st.state === 'idle' && st.mode !== 'elements');
   const msg = $('msg');
   msg.classList.toggle('bad', !!err);
   if (err) msg.textContent = err;
-  else if (!running) msg.textContent = 'Turn this page\'s buttons and boxes into walls and its cookies into enemies.';
-  else if (st.state === 'dead') msg.textContent = `Crushed on wave ${st.wave}. Score ${st.score}.`;
+  else if (!running) msg.textContent = 'Start attack sends waves of cookies. Page attack turns the page\'s own buttons, links and boxes against you.';
+  else if (st.state === 'dead') msg.textContent = st.mode === 'elements' ? `The page won. Score ${st.score}.` : `Crushed on wave ${st.wave}. Score ${st.score}.`;
+  else if (st.mode === 'elements') msg.textContent = `Page attack${st.paused ? ' (paused)' : ''}. HP ${st.hp}/${st.maxHp}. Score ${st.score}.`;
   else msg.textContent = `Wave ${st.wave}${st.paused ? ' (paused)' : ''}. HP ${st.hp}/${st.maxHp}. Score ${st.score}. ${st.walls} walls standing.`;
 }
 
@@ -36,16 +39,18 @@ async function refresh() {
   show(await send({ cc: 'status' }));
 }
 
-$('start').onclick = async () => {
+async function begin(mode) {
   try {
     await inject();
-    show(await send({ cc: 'start', sound: $('sound').checked }));
+    show(await send({ cc: 'start', mode, sound: $('sound').checked }));
     window.close();
   } catch (e) {
     blocked = BLOCKED_MSG;
     show(null, blocked);
   }
-};
+}
+$('start').onclick = () => begin('cookies');
+$('page').onclick = () => begin('elements');
 $('end').onclick = async () => { show(await send({ cc: 'end' })); };
 $('next').onclick = async () => { show(await send({ cc: 'next' })); window.close(); };
 $('sound').onchange = async () => {

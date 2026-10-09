@@ -460,7 +460,8 @@
   const CONTROL_SEL = 'button, input:not([type=hidden]), textarea, select, [role="button"], [role="tab"], [role="checkbox"], [role="switch"], [role="searchbox"], [role="textbox"], [role="combobox"]';
   const MEDIA_SEL = 'img, video, iframe, svg, canvas, picture, embed, object';
   const BOX_SEL = 'a, label, li, td, th, div, section, article, aside, nav, header, footer, form, figure, fieldset, details, summary, span, p, h1, h2, h3, h4, h5, h6, blockquote, pre, table, ul, ol, dl, main';
-  let pageEls = [];
+  let pageEls = [], mode = 'cookies', elementSpecs = [];
+  const moved = new Map();
   const saved = new Map();
 
   function visibleAlpha(c) {
@@ -526,6 +527,116 @@
       if (!out.some(o => o === el || o.contains(el) || el.contains(o))) out.push(el);
     }
     return out.slice(0, 60);
+  }
+
+  function detectEnemyElements() {
+    const vw = window.innerWidth, vh = window.innerHeight, area = vw * vh;
+    let cands = [];
+    const all = document.body ? document.body.querySelectorAll(CONTROL_SEL + ',' + MEDIA_SEL + ',' + BOX_SEL) : [];
+    for (const el of all) {
+      if (cands.length > 2000) break;
+      if (el === host || host.contains(el)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 16 || r.height < 12) continue;
+      if (r.left < 0 || r.top < 0 || r.right > vw || r.bottom > vh) continue;
+      if (r.width * r.height > area * 0.06 || r.height > vh / 4 || (r.width > vw / 3 && !isSearchBar(el))) continue;
+      const cs = getComputedStyle(el);
+      if (cs.visibility !== 'visible' || parseFloat(cs.opacity) < 0.1 || cs.display === 'none' || cs.position === 'fixed') continue;
+      const isControl = el.matches(CONTROL_SEL);
+      const isLink = el.tagName === 'A' && (el.textContent.trim() || el.querySelector('img, svg'));
+      const isMedia = el.matches('img, svg, picture');
+      if (el.matches('iframe, video, canvas, embed, object')) continue;
+      if (!isControl && !isLink && !isMedia && !looksLikeBox(cs)) continue;
+      if (el.getElementsByTagName('*').length > 150 || el.querySelector('iframe, video, canvas')) continue;
+      cands.push({ el, r });
+    }
+    cands.sort((a, b) => b.r.width * b.r.height - a.r.width * a.r.height);
+    const keep = [];
+    for (const c of cands) {
+      if (keep.some(k => k.el.contains(c.el))) continue;
+      if (cands.filter(o => o.el !== c.el && c.el.contains(o.el)).length > 3) continue;
+      keep.push(c);
+    }
+    const out = [];
+    for (const c of keep) {
+      const el = promoteToBox(c.el, c.r, vw, vh);
+      if (out.some(o => o === el || o.contains(el) || el.contains(o))) continue;
+      out.push(el);
+    }
+    for (let i = out.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [out[i], out[j]] = [out[j], out[i]]; }
+    return out.slice(0, 40);
+  }
+
+  function elementLabel(el) {
+    const t = (el.getAttribute('aria-label') || el.value || el.placeholder || el.alt || el.textContent || '').replace(/\s+/g, ' ').trim();
+    const tag = '<' + el.tagName.toLowerCase() + '>';
+    return t ? `${tag} ${t.length > 18 ? t.slice(0, 17) + '…' : t}` : tag;
+  }
+
+  let cloneLayer = null;
+
+  function copyStyles(src, dst) {
+    const cs = getComputedStyle(src);
+    for (let i = 0; i < cs.length; i++) {
+      const prop = cs[i];
+      dst.style.setProperty(prop, cs.getPropertyValue(prop));
+    }
+    const sk = src.children, dk = dst.children;
+    for (let i = 0; i < sk.length && i < dk.length; i++) copyStyles(sk[i], dk[i]);
+  }
+
+  function makeClone(el) {
+    if (!cloneLayer) {
+      cloneLayer = document.createElement('div');
+      cloneLayer.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483646;pointer-events:none;overflow:visible;display:block;';
+      document.documentElement.appendChild(cloneLayer);
+    }
+    const r = el.getBoundingClientRect();
+    const c = el.cloneNode(true);
+    c.removeAttribute('id');
+    c.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+    copyStyles(el, c);
+    if ('value' in el && el.value) c.value = el.value;
+    const st = c.style;
+    st.setProperty('position', 'fixed');
+    st.setProperty('left', r.left + 'px');
+    st.setProperty('top', r.top + 'px');
+    st.setProperty('width', r.width + 'px');
+    st.setProperty('height', r.height + 'px');
+    st.setProperty('box-sizing', 'border-box');
+    st.setProperty('margin', '0');
+    st.setProperty('transform', 'none');
+    st.setProperty('transition', 'none');
+    st.setProperty('animation', 'none');
+    st.setProperty('pointer-events', 'none');
+    st.setProperty('visibility', 'visible');
+    st.setProperty('z-index', 'auto');
+    cloneLayer.appendChild(c);
+    return c;
+  }
+
+  function moveElement(e) {
+    const el = e.el;
+    if (!e.clone) {
+      e.clone = makeClone(el);
+      if (!moved.has(el)) moved.set(el, { visibility: [el.style.getPropertyValue('visibility'), el.style.getPropertyPriority('visibility')], clones: [] });
+      moved.get(el).clones.push(e.clone);
+      el.style.setProperty('visibility', 'hidden', 'important');
+    }
+    let dx = e.x - e.homeX, dy = e.y - e.homeY;
+    if (e.hitFlash > 0) { dx += rand(-3, 3); dy += rand(-3, 3); }
+    e.clone.style.setProperty('translate', `${Math.round(dx)}px ${Math.round(dy)}px`);
+  }
+
+  function restoreElements() {
+    for (const [el, orig] of moved) {
+      orig.clones.forEach(c => c.remove());
+      const [v, pr] = orig.visibility;
+      if (v) el.style.setProperty('visibility', v, pr); else el.style.removeProperty('visibility');
+    }
+    moved.clear();
+    for (const e of enemies) e.clone = null;
+    if (cloneLayer) { cloneLayer.remove(); cloneLayer = null; }
   }
 
   function promoteToBox(el, r, vw, vh) {
@@ -739,6 +850,7 @@
   function clearField() {
     enemies = []; bullets = []; powerups = []; particles = []; floaters = []; spawnQueue = []; firstHalf = []; countdown = 0; flashes = []; rings = []; hitStop = 0; whiteFlash = 0;
     slashes = []; ghosts = []; lasers = [];
+    restoreElements();
     restoreObstacles();
     for (const k in cds) cds[k] = 0;
   }
@@ -775,6 +887,24 @@
     if (state !== 'idle') return;
     if (hasChrome) { try { chrome.runtime.sendMessage({ cc: 'wave', wave }).catch(() => {}); } catch (e) { /* ignore */ } }
     waveInfo = waveParams(wave);
+    if (mode === 'elements') {
+      restoreElements();
+      enemies = [];
+      firstHalf = elementSpecs.filter(sp => sp.el.isConnected).map(sp => ({ ...sp }));
+      spawnQueue = [];
+      countdown = 3;
+      spawnTimer = 0;
+      loadedThisWave = 0;
+      domainsThisWave = new Set();
+      state = 'wave';
+      paused = false;
+      player.inv = 1;
+      hidePanel();
+      SND.wave();
+      floaters.push({ x: W / 2, y: H * 0.35, text: 'THE PAGE IS FIGHTING BACK', color: '#c62828', life: 2, max: 2, big: true });
+      updateBadge();
+      return;
+    }
     const q = [];
     for (let i = 0; i < waveInfo.count; i++) {
       q.push({ kind: Math.random() < waveInfo.shooterFrac ? 'shooter' : 'chaser' });
@@ -806,6 +936,23 @@
   }
 
   function waveCleared() {
+    if (mode === 'elements') {
+      state = 'idle';
+      lasers = [];
+      bullets = bullets.filter(b => b.from === 'player');
+      SND.clear();
+      score += 500;
+      floaters.push({ x: W / 2, y: H * 0.35, text: 'PAGE CLEARED  +500', color: '#1f8a17', life: 2.4, max: 2.4, big: true });
+      updateBadge();
+      setTimeout(() => {
+        if (state !== 'idle' || !running) return;
+        showPanel('Page cleared', `You took apart every element on the page with ${Math.ceil(player.hp)} HP left. Score ${score.toLocaleString()}.`, [
+          { label: 'Play again', primary: true, onClick: () => { resetGame(); startWave(); } },
+          { label: 'End attack', onClick: end }
+        ], 'End attack puts the page back');
+      }, 1300);
+      return;
+    }
     state = 'idle';
     const bonus = 100 * wave;
     score += bonus;
@@ -839,7 +986,7 @@
     SND.dead();
     setTimeout(() => {
       if (!running) return;
-      showPanel('Aw, Snap!', `Too many cookies got through. You reached wave ${wave} with ${score.toLocaleString()} points.`, [
+      showPanel('Aw, Snap!', mode === 'elements' ? `The page won. ${enemies.filter(e => !e.dead).length} elements were still standing. Score ${score.toLocaleString()}.` : `Too many cookies got through. You reached wave ${wave} with ${score.toLocaleString()} points.`, [
         { label: 'Try again', primary: true, onClick: () => { resetGame(); startWave(); } },
         { label: 'End attack', onClick: end }
       ], '', true);
@@ -848,7 +995,33 @@
 
   /* ---------- spawning ---------- */
 
+  function spawnElement(spec) {
+    const el = spec.el, r = el.getBoundingClientRect();
+    const n = spec.count, nerf = Math.max(1, n / 3);
+    const hw = r.width / 2, hh = r.height / 2;
+    const boss = spec.kind === 'boss';
+    const e = {
+      kind: spec.kind, el, name: elementLabel(el), domain: '', x: r.left + hw, y: r.top + hh, homeX: r.left + hw, homeY: r.top + hh,
+      hw, hh, r: Math.max(10, Math.min(Math.max(hw, hh), Math.min(hw, hh) * 1.6 + 6)), scale: 3, vx: 0, vy: 0,
+      spawnT: 0.75, hitFlash: 0, contactCd: 0, wanderA: rand(0, Math.PI * 2), t: 0, nerf,
+      shots: 0, shotT: 0, spinA: rand(0, 6.3), orbitA: rand(0, 6.3), orbitDir: Math.random() < 0.5 ? 1 : -1
+    };
+    if (boss) {
+      Object.assign(e, { hp: 320, speed: 50, dmg: 13, touch: 30, bulletSpeed: 150, phase: 'orbit', phaseT: 3, windup: 0, chargesLeft: 0, fadeT: 0, trailT: 0,
+        variant: pick(BOSS_VARIANTS), fireCd: 1.5 });
+    } else {
+      Object.assign(e, { hp: clamp(Math.sqrt(r.width * r.height) * 0.6, 20, 90), speed: 105 * rand(0.85, 1.15) * Math.max(0.6, 1 - n * 0.01), dmg: 11, touch: 18,
+        keep: rand(170, 260), pattern: pick(PATTERNS).id, bulletSpeed: 330 * Math.max(0.75, 1 - n * 0.006), fireCd: rand(0.4, 2.5) * nerf });
+    }
+    e.maxHp = e.hp;
+    enemies.push(e);
+    rings.push({ x: e.x, y: e.y, r: 2, rmax: Math.max(hw, hh) * 1.6, color: RING_COLORS[e.kind], life: 0.75, max: 0.75, w: 3 });
+    moveElement(e);
+    return e;
+  }
+
   function spawn(spec, atX, atY) {
+    if (spec.el) return spawnElement(spec);
     const kind = spec.kind;
     const info = pick(DB[kind]);
     let x, y, tries = 0;
@@ -946,6 +1119,7 @@
     burst(e.x, e.y, p.body, 14 + e.scale * 2);
     burst(e.x, e.y, p.chip, 6 + e.scale);
     e.dead = true;
+    if (e.clone) e.clone.remove();
     if (e.kind === 'necessary') {
       score = Math.max(0, score - 150);
       floaters.push({ x: e.x, y: e.y - 20, text: 'SITE BROKE! -150', color: '#d32f2f', life: 1.4, max: 1.4 });
@@ -1251,7 +1425,7 @@
     }
     e.ghost = false;
     let next;
-    do { next = pick(BOSS_PHASES); } while (next === e.phase);
+    do { next = pick(BOSS_PHASES); } while (next === e.phase || (e.el && next === 'teleport'));
     if (next !== 'orbit' && Math.random() < 0.4) next = 'orbit';
     e.phase = next;
     if (next === 'orbit') { e.phaseT = 4.5; e.orbitA = Math.atan2(e.y - player.y, e.x - player.x) + Math.PI; e.orbitDir = Math.random() < 0.5 ? 1 : -1; }
@@ -1394,7 +1568,7 @@
         if (lasers.some(lz => lz.owner === e)) { tvx *= 0.15; tvy *= 0.15; }
         shooterStream(e, dt);
         e.fireCd -= dt;
-        if (e.fireCd <= 0 && e.shots <= 0) shooterFire(e, aim);
+        if (e.fireCd <= 0 && e.shots <= 0) { shooterFire(e, aim); if (e.nerf) e.fireCd *= e.nerf; }
       } else if (e.kind === 'boss') {
         const aim = Math.atan2(dy, dx);
         const rage = e.hp < e.maxHp * 0.4 ? 1.35 : 1;
@@ -1402,7 +1576,7 @@
         e.phaseT -= dt * rage;
         if (e.phaseT <= 0) bossNextPhase(e);
         e.fireCd -= dt * rage;
-        if (e.fireCd <= 0 && e.shots <= 0 && !e.ghost) bossFire(e, aim);
+        if (e.fireCd <= 0 && e.shots <= 0 && !e.ghost) { bossFire(e, aim); if (e.nerf) e.fireCd *= Math.sqrt(e.nerf); }
         steer = 2;
         if (e.phase === 'orbit') {
           e.orbitA += dt * 0.75 * e.orbitDir * rage;
@@ -1466,6 +1640,7 @@
       } else if (e.kind === 'necessary' && d < e.r + p.r) {
         p.x += nx * 2; p.y += ny * 2;
       }
+      if (e.el) moveElement(e);
     }
 
     for (let i = 0; i < enemies.length; i++) {
@@ -1509,7 +1684,7 @@
       if (b.from === 'player') {
         for (const e of enemies) {
           if (e.dead || e.spawnT > 0 || e.ghost) continue;
-          if (hyp(e.x - b.x, e.y - b.y) < e.r + b.r) {
+          if (e.el ? Math.abs(e.x - b.x) < e.hw + b.r && Math.abs(e.y - b.y) < e.hh + b.r : hyp(e.x - b.x, e.y - b.y) < e.r + b.r) {
             b.life = 0;
             damageEnemy(e, b.dmg, b.vx * 0.05, b.vy * 0.05, 0.6);
             break;
@@ -1553,7 +1728,49 @@
 
   const TAG_COLORS = { necessary: '#2e7d32', chaser: '#b71c1c', shooter: '#5e35b1', boss: '#4a148c' };
 
+  function drawElementEnemy(e) {
+    const k = e.spawnT > 0 ? 1 - e.spawnT / 0.75 : 1;
+    const col = e.kind === 'boss' ? (BOSS_COLORS[e.variant] || '#aa00ff') : PATTERN_COLORS[e.pattern] || '#e0157a';
+    const pulse = 0.55 + Math.sin(e.t * 6) * 0.25;
+    ctx.save();
+    ctx.globalAlpha = k * pulse;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = e.kind === 'boss' ? 4 : 2;
+    ctx.setLineDash([6, 4]);
+    ctx.lineDashOffset = -e.t * 30;
+    const pad = 4 + (1 - k) * 20;
+    ctx.strokeRect(Math.round(e.x - e.hw - pad) + 0.5, Math.round(e.y - e.hh - pad) + 0.5, Math.round(e.hw * 2 + pad * 2), Math.round(e.hh * 2 + pad * 2));
+    ctx.setLineDash([]);
+    if (e.hitFlash > 0) {
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = '#ffd740';
+      ctx.fillRect(e.x - e.hw, e.y - e.hh, e.hw * 2, e.hh * 2);
+    }
+    ctx.restore();
+    if (e.spawnT > 0) return;
+    if (e.nerf > 4 && e.kind !== 'boss' && e.hp >= e.maxHp) return;
+    const fs = e.kind === 'boss' ? 10 : 8;
+    const label = e.kind === 'boss' ? `BOSS ${e.name}` : e.name;
+    ctx.font = `${fs}px CCSilk, monospace`;
+    const tw = Math.ceil(ctx.measureText(label).width) + 6;
+    const ty = Math.round(e.y - e.hh - 12);
+    ctx.fillStyle = e.kind === 'boss' ? TAG_COLORS.boss : col;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(Math.round(e.x - tw / 2), ty - fs / 2 - 2, tw, fs + 3);
+    ctx.globalAlpha = 1;
+    text(label, Math.round(e.x), ty, fs, '#fff');
+    if (e.hp < e.maxHp) {
+      const bw = Math.max(30, Math.min(140, e.hw * 2));
+      const by = Math.round(e.y + e.hh + 6);
+      ctx.fillStyle = '#333';
+      ctx.fillRect(Math.round(e.x - bw / 2) - 1, by - 1, bw + 2, 5);
+      ctx.fillStyle = '#e53935';
+      ctx.fillRect(Math.round(e.x - bw / 2), by, Math.max(0, bw * e.hp / e.maxHp), 3);
+    }
+  }
+
   function drawEnemy(e) {
+    if (e.el) return drawElementEnemy(e);
     const spr = SPRITES[e.kind];
     const size = 14 * e.scale;
     if (e.spawnT > 0) {
@@ -2109,7 +2326,19 @@
   function start(opts) {
     if (running) return status();
     if (opts && typeof opts.sound === 'boolean') prefs.sound = opts.sound;
-    pageEls = detectElements();
+    mode = opts && opts.mode === 'elements' ? 'elements' : 'cookies';
+    elementSpecs = [];
+    if (mode === 'elements') {
+      const els = detectEnemyElements();
+      if (els.length) {
+        let bossEl = null;
+        if (els.length <= 6) bossEl = els.reduce((a, b) => { const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(); return rb.width * rb.height > ra.width * ra.height ? b : a; });
+        elementSpecs = els.map(el => ({ el, kind: el === bossEl ? 'boss' : 'shooter', count: els.length }));
+      } else {
+        mode = 'cookies';
+      }
+    }
+    pageEls = mode === 'elements' ? [] : detectElements();
     savedOverflow.html = document.documentElement.style.overflow;
     savedOverflow.body = document.body ? document.body.style.overflow : '';
     document.documentElement.style.overflow = 'hidden';
@@ -2119,7 +2348,8 @@
     resize();
     player = newPlayer();
     resetGame();
-    if (!obstacles.length) floaters.push({ x: W / 2, y: H * 0.45, text: 'NO PAGE ELEMENTS FOUND - OPEN ARENA', color: '#666', life: 2.5, max: 2.5 });
+    if (opts && opts.mode === 'elements' && mode === 'cookies') floaters.push({ x: W / 2, y: H * 0.45, text: 'NOTHING TO ANIMATE - COOKIES INSTEAD', color: '#666', life: 2.5, max: 2.5 });
+    else if (mode === 'cookies' && !obstacles.length) floaters.push({ x: W / 2, y: H * 0.45, text: 'NO PAGE ELEMENTS FOUND - OPEN ARENA', color: '#666', life: 2.5, max: 2.5 });
     window.addEventListener('resize', resize, sig);
     last = performance.now();
     rafId = requestAnimationFrame(frame);
@@ -2132,6 +2362,7 @@
     running = false;
     state = 'ended';
     cancelAnimationFrame(rafId);
+    restoreElements();
     restoreObstacles();
     cleanup();
     return status();
@@ -2148,7 +2379,7 @@
   }
 
   function status() {
-    return { running, state, wave, score, hp: player ? Math.ceil(player.hp) : 0, maxHp: player ? player.maxHp : 0, walls: obstacles.length, paused };
+    return { running, mode, state, wave, score, hp: player ? Math.ceil(player.hp) : 0, maxHp: player ? player.maxHp : 0, walls: obstacles.length, paused };
   }
 
   function onMessage(msg, sender, reply) {
