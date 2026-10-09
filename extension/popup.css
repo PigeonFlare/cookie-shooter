@@ -10,3 +10,4 @@ button.primary { font-weight: bold; }
 button[hidden] { display: none; }
 label { display: block; margin-bottom: 6px; }
 .help { margin: 0; color: #777; font-size: 11px; }
+button:disabled { color: #999; cursor: default; border-color: #bbb; background: #eee; }
