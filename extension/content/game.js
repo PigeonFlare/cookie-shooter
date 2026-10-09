@@ -567,7 +567,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       out.push(el);
     }
     for (let i = out.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [out[i], out[j]] = [out[j], out[i]]; }
-    return out.slice(0, 30);
+    return out;
   }
 
   function elementLabel(el) {
@@ -2422,7 +2422,15 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && getComputedStyle(document.documentElement).colorScheme.includes('dark'));
   }
 
-  const DIFF_MAX = { easy: 5, medium: 10, hard: 30 };
+  const DIFF_MAX = { easy: 10, medium: 30, hard: deviceCap() };
+
+  function deviceCap() {
+    const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 8;
+    const touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (cores <= 2 || mem <= 2) return 40;
+    if (cores < 6 || mem < 4 || touch) return 70;
+    return cores >= 10 ? 150 : 110;
+  }
   let difficulty = 'medium';
 
   function start(opts) {
