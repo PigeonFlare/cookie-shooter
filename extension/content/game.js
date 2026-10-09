@@ -69,7 +69,10 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
 
   let W = 0, H = 0;
 
+  let weaponRect = null;
+
   function resize() {
+    weaponRect = null;
     W = window.innerWidth;
     H = window.innerHeight;
     const dpr = lowFx ? 1 : Math.min(2, window.devicePixelRatio || 1);
@@ -263,6 +266,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
   }
 
   const CD_MAX = { swing: 0.42, shoot: 0.16, dash: 0.9 };
+
   function updateWeaponUi() {
     for (const k in weaponBtns) {
       const f = clamp(cds[k] / CD_MAX[k], 0, 1);
@@ -270,7 +274,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     }
     const wb = weaponsEl;
     if (player && wb) {
-      const r = wb.getBoundingClientRect();
+      const r = weaponRect || (weaponRect = wb.getBoundingClientRect());
       const x0 = r.left - 10, x1 = r.right + 10, y0 = r.top - 10, y1 = r.bottom + 10;
       const near = (x, y, rr) => x + rr > x0 && x - rr < x1 && y + rr > y0 && y - rr < y1;
       wb.classList.toggle('faded', near(player.x, player.y, player.r) || enemies.some(e => near(e.x, e.y, e.r)));
@@ -470,6 +474,18 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     return /search|\bq\b|query|find/.test(hint);
   }
 
+  function descendantsMap(cands) {
+    const set = new Set(cands.map(c => c.el)), desc = new Map();
+    for (const c of cands) {
+      for (let p = c.el.parentElement; p; p = p.parentElement) {
+        if (!set.has(p)) continue;
+        if (!desc.has(p)) desc.set(p, []);
+        desc.get(p).push(c.el);
+      }
+    }
+    return desc;
+  }
+
   function detectElements() {
     const vw = window.innerWidth, vh = window.innerHeight, area = vw * vh;
     let cands = [];
@@ -495,13 +511,14 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     const controls = cands.filter(c => c.isControl);
     cands = cands.filter(c => !controls.some(p => p.el !== c.el && p.el.contains(c.el)));
     cands.sort((a, b) => b.r.width * b.r.height - a.r.width * a.r.height);
+    const desc = descendantsMap(cands);
     const dropped = new Set();
     let keep = [];
     for (const c of cands) {
       if (dropped.has(c.el)) continue;
-      const inner = cands.filter(o => o.el !== c.el && !dropped.has(o.el) && c.el.contains(o.el));
+      const inner = (desc.get(c.el) || []).filter(o => !dropped.has(o));
       if (inner.length > 3) continue;
-      inner.forEach(o => dropped.add(o.el));
+      inner.forEach(o => dropped.add(o));
       keep.push(c);
     }
     const out = [];
@@ -534,10 +551,13 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       cands.push({ el, r });
     }
     cands.sort((a, b) => b.r.width * b.r.height - a.r.width * a.r.height);
-    const keep = [];
+    const desc = descendantsMap(cands);
+    const keep = [], kept = new Set();
     for (const c of cands) {
-      if (keep.some(k => k.el.contains(c.el))) continue;
-      if (cands.filter(o => o.el !== c.el && c.el.contains(o.el)).length > 3) continue;
+      let covered = false;
+      for (let p = c.el.parentElement; p && !covered; p = p.parentElement) covered = kept.has(p);
+      if (covered || (desc.get(c.el) || []).length > 3) continue;
+      kept.add(c.el);
       keep.push(c);
     }
     const out = [];
@@ -562,17 +582,40 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
   const SKIP_ATTRS = new Set(['id', 'class', 'style', 'name', 'is', 'slot', 'part', 'srcdoc', 'autofocus', 'autoplay', 'contenteditable', 'tabindex', 'popover']);
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
-  function copyStyles(src, dst) {
+  const STYLE_PROPS = 'display top right bottom left width height min-width min-height max-width max-height box-sizing margin-top margin-right margin-bottom margin-left padding-top padding-right padding-bottom padding-left border-top-width border-right-width border-bottom-width border-left-width border-top-style border-right-style border-bottom-style border-left-style border-top-color border-right-color border-bottom-color border-left-color border-top-left-radius border-top-right-radius border-bottom-right-radius border-bottom-left-radius border-collapse border-spacing background-color background-image background-size background-position background-repeat background-clip background-origin color font-family font-size font-weight font-style font-variant line-height letter-spacing word-spacing text-align text-indent text-transform text-decoration-line text-decoration-color text-decoration-style text-overflow text-shadow white-space word-break overflow-wrap overflow-x overflow-y opacity box-shadow transform transform-origin vertical-align float clear position z-index visibility flex-direction flex-wrap justify-content align-items align-content align-self flex-grow flex-shrink flex-basis order row-gap column-gap grid-template-columns grid-template-rows grid-template-areas grid-auto-flow grid-auto-columns grid-auto-rows grid-column-start grid-column-end grid-row-start grid-row-end object-fit object-position aspect-ratio list-style-type list-style-position filter clip-path direction writing-mode table-layout -webkit-line-clamp -webkit-box-orient fill stroke stroke-width outline-style outline-width outline-color outline-offset'.split(' ');
+  const styleDefaults = new Map();
+
+  function defaultsFor(dst) {
+    const key = dst.localName + '|' + (dst.getAttribute('type') || '') + '|' + dst.hasAttribute('href');
+    let d = styleDefaults.get(key);
+    if (d) return d;
+    const probe = document.createElement(dst.localName);
+    if (dst.hasAttribute('type')) probe.setAttribute('type', dst.getAttribute('type'));
+    if (dst.hasAttribute('href')) probe.setAttribute('href', '#');
+    cloneLayer.appendChild(probe);
+    const cs = getComputedStyle(probe);
+    d = new Map();
+    for (const prop of STYLE_PROPS) d.set(prop, cs.getPropertyValue(prop));
+    probe.remove();
+    styleDefaults.set(key, d);
+    return d;
+  }
+
+  function copyStyles(src, dst, parentCs) {
     const cs = getComputedStyle(src);
     const st = dst.style;
-    for (let i = 0; i < cs.length; i++) {
-      const prop = cs[i];
-      st.setProperty(prop, cs.getPropertyValue(prop));
+    const d = cloneLayer ? defaultsFor(dst) : null;
+    for (const prop of STYLE_PROPS) {
+      const v = cs.getPropertyValue(prop);
+      if (d && v === d.get(prop) && (!parentCs || parentCs.getPropertyValue(prop) === v)) continue;
+      st.setProperty(prop, v);
     }
+    return cs;
   }
 
   function copySvgStyles(src, dst) {
-    copyStyles(src, dst);
+    const cs = getComputedStyle(src);
+    for (let i = 0; i < cs.length; i++) dst.style.setProperty(cs[i], cs.getPropertyValue(cs[i]));
     const sk = src.children, dk = dst.children;
     for (let i = 0; i < sk.length && i < dk.length; i++) copySvgStyles(sk[i], dk[i]);
   }
@@ -588,7 +631,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     return out;
   }
 
-  function cloneTree(src, budget) {
+  function cloneTree(src, budget, parentCs) {
     if (src.nodeType === 3) return document.createTextNode(src.data);
     if (src.nodeType !== 1 || budget.n-- <= 0) return null;
     const tag = src.localName;
@@ -606,13 +649,13 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       if (SKIP_ATTRS.has(n) || n.startsWith('on')) continue;
       try { dst.setAttribute(a.name, a.value); } catch {}
     }
-    copyStyles(src, dst);
+    const cs = copyStyles(src, dst, parentCs);
     if ((tag === 'input' || tag === 'textarea' || tag === 'select') && src.value) {
       try { dst.value = src.value; } catch {}
     }
     if (tag === 'img' && src.currentSrc) dst.setAttribute('src', src.currentSrc);
     for (const k of renderedChildren(src)) {
-      const c = cloneTree(k, budget);
+      const c = cloneTree(k, budget, cs);
       if (c) dst.appendChild(c);
       if (budget.n <= 0) break;
     }
@@ -655,9 +698,14 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
   function moveElement(e) {
     const el = e.el;
     if (!e.clone) {
-      if (clonesThisFrame > 0 && performance.now() - frameStart > 8) return;
-      clonesThisFrame++;
-      e.clone = makeClone(el);
+      if (e.preClone && e.preClone.isConnected) {
+        e.clone = e.preClone;
+        e.clone.style.setProperty('visibility', 'visible');
+      } else {
+        if (clonesThisFrame > 0 && performance.now() - frameStart > 8) return;
+        clonesThisFrame++;
+        e.clone = makeClone(el);
+      }
       if (!moved.has(el)) moved.set(el, { visibility: [el.style.getPropertyValue('visibility'), el.style.getPropertyPriority('visibility')], clones: [] });
       moved.get(el).clones.push(e.clone);
       el.style.setProperty('visibility', 'hidden', 'important');
@@ -665,6 +713,15 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     let dx = e.x - e.homeX, dy = e.y - e.homeY;
     if (e.hitFlash > 0) { dx += rand(-3, 3); dy += rand(-3, 3); }
     e.clone.style.setProperty('transform', `translate(${Math.round(dx)}px, ${Math.round(dy)}px)`);
+  }
+
+  function prepareClones() {
+    for (const sp of firstHalf) {
+      if (sp.clone || !sp.el.isConnected) continue;
+      if (performance.now() - frameStart > 3) return;
+      sp.clone = makeClone(sp.el);
+      sp.clone.style.setProperty('visibility', 'hidden');
+    }
   }
 
   function restoreElements() {
@@ -1017,7 +1074,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     const e = {
       kind: spec.kind, el, name: elementLabel(el), domain: '', x: r.left + hw, y: r.top + hh, homeX: r.left + hw, homeY: r.top + hh,
       hw, hh, r: Math.max(10, Math.min(Math.max(hw, hh), Math.min(hw, hh) * 1.6 + 6)), scale: 3, vx: 0, vy: 0,
-      spawnT: 0.75, hitFlash: 0, contactCd: 0, wanderA: rand(0, Math.PI * 2), t: 0, nerf,
+      spawnT: 0.75, hitFlash: 0, contactCd: 0, wanderA: rand(0, Math.PI * 2), t: 0, nerf, preClone: spec.clone || null,
       shots: 0, shotT: 0, spinA: rand(0, 6.3), orbitA: rand(0, 6.3), orbitDir: Math.random() < 0.5 ? 1 : -1
     };
     if (boss) {
@@ -1248,6 +1305,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
 
     if (state === 'wave') {
       if (countdown > 0) {
+        if (mode === 'elements') prepareClones();
         const before = Math.ceil(countdown);
         countdown -= dt;
         if (countdown <= 0) {
@@ -2376,6 +2434,10 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     mode = opts && opts.mode === 'elements' ? 'elements' : 'cookies';
     if (opts && DIFF_MAX[opts.difficulty]) difficulty = opts.difficulty;
     pageDark = isPageDark();
+    savedOverflow.html = document.documentElement.style.overflow;
+    savedOverflow.body = document.body ? document.body.style.overflow : '';
+    document.documentElement.style.overflow = 'hidden';
+    if (document.body) document.body.style.overflow = 'hidden';
     elementSpecs = [];
     if (mode === 'elements') {
       const els = detectEnemyElements().slice(0, DIFF_MAX[difficulty]);
@@ -2394,10 +2456,6 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       }
     }
     pageEls = mode === 'elements' ? [] : detectElements();
-    savedOverflow.html = document.documentElement.style.overflow;
-    savedOverflow.body = document.body ? document.body.style.overflow : '';
-    document.documentElement.style.overflow = 'hidden';
-    if (document.body) document.body.style.overflow = 'hidden';
     document.documentElement.appendChild(host);
     running = true;
     resize();
