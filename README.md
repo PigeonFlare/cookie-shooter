@@ -30,7 +30,7 @@ Waves grow in size, speed and damage. Deleted trackers sometimes drop a power-up
 
 ## The page fights back too
 
-The Google logo letters, search box, buttons and links in the middle of the page are solid. They block you, the cookies and every bullet and laser. Your shots, swings, dashes and bumps crack them, and each one shatters after five hits. Enemies path around whatever is still standing to reach you, and the page rebuilds itself at the start of every wave.
+The Google logo letters, search box, buttons and links in the middle of the page are solid. They block you, the cookies and every bullet and laser. During a wave, every bullet that hits one (yours or the cookies') makes it shake, and each one shatters after five hits. Swings, dashes and bumps don't hurt them. Enemies path around whatever is still standing to reach you, and the page fully rebuilds itself when the wave ends.
 
 ## The extension menu
 

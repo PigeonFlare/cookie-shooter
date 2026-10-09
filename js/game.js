@@ -522,7 +522,7 @@
       const old = prev.get(el);
       obstacles.push({
         el, x: r.left - vr.left, y: r.top - vr.top, w: r.width, h: r.height,
-        hp: old ? old.hp : OBST_HP, cracks: old ? old.cracks : [], hitCd: 0, color: obstacleColor(el)
+        hp: old ? old.hp : OBST_HP, color: obstacleColor(el)
       });
     }
     buildNav();
@@ -532,30 +532,18 @@
     for (const el of obstacleEls()) {
       el.dataset.broken = '';
       el.style.visibility = '';
-      el.style.opacity = '';
+      el.classList.remove('ghit');
     }
     obstacles = [];
     measureObstacles();
   }
 
-  function hitObstacle(o, x, y) {
-    if (o.hp <= 0) return;
+  function hitObstacle(o) {
+    if (o.hp <= 0 || state !== 'wave') return;
     o.hp--;
-    const fx = clamp((x - o.x) / o.w, 0.05, 0.95), fy = clamp((y - o.y) / o.h, 0.05, 0.95);
-    const crack = [[fx, fy]];
-    let cx = fx, cy = fy;
-    for (let i = 0; i < 3; i++) {
-      cx = clamp(cx + rand(-0.25, 0.25), 0, 1);
-      cy = clamp(cy + rand(-0.35, 0.35), 0, 1);
-      crack.push([cx, cy]);
-    }
-    o.cracks.push(crack);
-    o.el.style.opacity = (0.45 + 0.55 * o.hp / OBST_HP).toFixed(2);
     o.el.classList.remove('ghit');
     void o.el.offsetWidth;
     o.el.classList.add('ghit');
-    burst(x, y, o.color, 5, 90);
-    sfx(160 + o.hp * 40, 0.06, 'square', 0.03, -60);
     if (o.hp <= 0) breakObstacle(o);
   }
 
@@ -700,21 +688,6 @@
     return { x: dx / d, y: dy / d };
   }
 
-  function drawCracks() {
-    ctx.strokeStyle = 'rgba(40,40,40,.75)';
-    ctx.lineWidth = 2;
-    for (const o of obstacles) {
-      for (const cr of o.cracks) {
-        ctx.beginPath();
-        cr.forEach(([fx, fy], i) => {
-          const x = Math.round(o.x + fx * o.w), y = Math.round(o.y + fy * o.h);
-          if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
-        });
-        ctx.stroke();
-      }
-    }
-  }
-
   /* ---------- game flow ---------- */
 
   function clearField() {
@@ -791,6 +764,7 @@
     });
     enemies = [];
     lasers = [];
+    restoreObstacles();
     bullets = bullets.filter(b => b.from === 'player');
     const heal = Math.round(player.maxHp * 0.15);
     player.hp = Math.min(player.maxHp, player.hp + heal);
@@ -1066,13 +1040,7 @@
     }
     p.x = clamp(p.x + p.vx * dt, p.r, W - p.r);
     p.y = clamp(p.y + p.vy * dt, p.r, H - p.r);
-    for (const o of obstacles) o.hitCd = Math.max(0, o.hitCd - dt);
-    const bump = pushOut(p, p.r);
-    if (bump && bump.o.hitCd <= 0 && (p.dashT > 0 || bump.vn < -60)) {
-      bump.o.hitCd = 0.45;
-      hitObstacle(bump.o, bump.c.px, bump.c.py);
-      if (p.dashT > 0) { p.dashT = 0; shake = Math.min(10, shake + 3); }
-    }
+    if (pushOut(p, p.r) && p.dashT > 0) p.dashT = 0;
     p.inv = Math.max(0, p.inv - dt);
 
     if (touch.active) {
@@ -1117,14 +1085,6 @@
         da = Math.atan2(Math.sin(da), Math.cos(da));
         if (Math.abs(da) > BASE.swingArc && d > e.r) continue;
         damageEnemy(e, dmg * 2.2, dx / (d || 1) * 220, dy / (d || 1) * 220, 0.35);
-      }
-      for (const o of obstacles.slice()) {
-        const nx = clamp(p.x, o.x, o.x + o.w), ny = clamp(p.y, o.y, o.y + o.h);
-        const dx = nx - p.x, dy = ny - p.y, d = hyp(dx, dy);
-        if (d > reach) continue;
-        let da = Math.atan2(dy, dx) - a;
-        da = Math.atan2(Math.sin(da), Math.cos(da));
-        if (Math.abs(da) <= BASE.swingArc + 0.3 || d < p.r + 2) hitObstacle(o, nx, ny);
       }
       for (const b of bullets) {
         if (b.from !== 'enemy') continue;
@@ -1512,8 +1472,7 @@
       const wall = obstacles.length ? obstacleAt(b.x, b.y, b.r * 0.5) : null;
       if (wall) {
         b.life = 0;
-        if (b.from === 'player') hitObstacle(wall, b.x, b.y);
-        else burst(b.x, b.y, b.color, 2, 50);
+        hitObstacle(wall);
         continue;
       }
 
@@ -1829,7 +1788,6 @@
       ctx.fillRect(0, 0, W, H);
     }
     drawHud();
-    drawCracks();
 
     for (const pu of powerups) drawPowerup(pu);
     for (const e of enemies) if (e.kind === 'necessary') drawEnemy(e);
