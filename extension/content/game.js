@@ -11,41 +11,52 @@
   host.id = 'cookie-crusher-host';
   host.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483647;display:block;';
   const root = host.attachShadow({ mode: 'closed' });
-  root.innerHTML = `
-    <style>
-      :host { all: initial; }
-      * { box-sizing: border-box; }
-      canvas.game { position: fixed; inset: 0; width: 100vw; height: 100vh; cursor: crosshair; touch-action: none; image-rendering: pixelated; }
-      .weapons { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; gap: 8px; transition: opacity .15s; }
-      .weapons.faded { opacity: .3; }
-      .wbtn { position: relative; width: 58px; height: 58px; padding: 4px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow: hidden;
-        background: linear-gradient(#fdfdfd, #e6ecf5); border: 1px solid #8a9bb7; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,.25); cursor: pointer; touch-action: manipulation; }
-      .wbtn canvas { image-rendering: pixelated; height: 24px; width: auto; }
-      .wbtn .wname { font: 8px CCSilk, monospace; color: #334; }
-      .wbtn .key { position: absolute; top: 2px; left: 3px; font: bold 9px/1 Tahoma, Verdana, sans-serif; color: #667; }
-      .wbtn.active { border-color: #e0a000; background: linear-gradient(#fffbe6, #ffe9a8); box-shadow: 0 0 0 2px rgba(255,190,0,.6), 0 2px 4px rgba(0,0,0,.25); }
-      .wbtn .cd { position: absolute; left: 0; right: 0; top: 0; height: 0; background: rgba(40,50,80,.35); pointer-events: none; }
-      .panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 280px; max-width: 90vw; padding: 14px 16px 12px; text-align: center;
-        font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; border: 1px solid #6d89b8; border-radius: 4px; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
-      .panel.hidden { display: none; }
-      .panel h2 { margin: 0 0 6px; font: 14px CCSilk, monospace; color: #1851ce; }
-      .panel h2.bad { color: #c62828; }
-      .panel p { margin: 4px 0 10px; }
-      .panel .btns { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
-      .panel button { font: 12px Tahoma, Verdana, sans-serif; padding: 5px 12px; color: #000; background: linear-gradient(#fdfdfd, #ececec 50%, #ddd); border: 1px solid #999; border-radius: 2px; cursor: pointer; }
-      .panel button.primary { font-weight: bold; }
-      .panel button:hover { border-color: #6d89b8; background: linear-gradient(#fff, #f2f6fc 50%, #dfe8f6); }
-      .panel .hint { color: #777; font-size: 11px; margin-top: 8px; }
-      @media (max-width: 720px) { .weapons { bottom: 24px; gap: 12px; } .wbtn { width: 64px; height: 64px; } }
-    </style>
-    <canvas class="game"></canvas>
-    <div class="weapons">
-      <button class="wbtn" data-w="swing" title="Swing (1)"><span class="key">1</span><canvas></canvas><span class="wname">Swing</span><span class="cd"></span></button>
-      <button class="wbtn active" data-w="shoot" title="Shoot (2)"><span class="key">2</span><canvas></canvas><span class="wname">Shoot</span><span class="cd"></span></button>
-      <button class="wbtn" data-w="dash" title="Dash (3)"><span class="key">3</span><canvas></canvas><span class="wname">Dash</span><span class="cd"></span></button>
-    </div>
-    <div class="panel hidden"><h2></h2><p></p><div class="btns"></div><div class="hint"></div></div>
-  `;
+  const css = `:host { all: initial; }
+* { box-sizing: border-box; }
+canvas.game { position: fixed; inset: 0; width: 100vw; height: 100vh; cursor: crosshair; touch-action: none; image-rendering: pixelated; }
+.weapons { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; gap: 8px; transition: opacity .15s; }
+.weapons.faded { opacity: .3; }
+.wbtn { position: relative; width: 58px; height: 58px; padding: 4px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow: hidden;
+background: linear-gradient(#fdfdfd, #e6ecf5); border: 1px solid #8a9bb7; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,.25); cursor: pointer; touch-action: manipulation; }
+.wbtn canvas { image-rendering: pixelated; height: 24px; width: auto; }
+.wbtn .wname { font: 8px CCSilk, monospace; color: #334; }
+.wbtn .key { position: absolute; top: 2px; left: 3px; font: bold 9px/1 Tahoma, Verdana, sans-serif; color: #667; }
+.wbtn.active { border-color: #e0a000; background: linear-gradient(#fffbe6, #ffe9a8); box-shadow: 0 0 0 2px rgba(255,190,0,.6), 0 2px 4px rgba(0,0,0,.25); }
+.wbtn .cd { position: absolute; left: 0; right: 0; top: 0; height: 0; background: rgba(40,50,80,.35); pointer-events: none; }
+.panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 280px; max-width: 90vw; padding: 14px 16px 12px; text-align: center;
+font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; border: 1px solid #6d89b8; border-radius: 4px; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+.panel.hidden { display: none; }
+.panel h2 { margin: 0 0 6px; font: 14px CCSilk, monospace; color: #1851ce; }
+.panel h2.bad { color: #c62828; }
+.panel p { margin: 4px 0 10px; }
+.panel .btns { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.panel button { font: 12px Tahoma, Verdana, sans-serif; padding: 5px 12px; color: #000; background: linear-gradient(#fdfdfd, #ececec 50%, #ddd); border: 1px solid #999; border-radius: 2px; cursor: pointer; }
+.panel button.primary { font-weight: bold; }
+.panel button:hover { border-color: #6d89b8; background: linear-gradient(#fff, #f2f6fc 50%, #dfe8f6); }
+.panel .hint { color: #777; font-size: 11px; margin-top: 8px; }
+@media (max-width: 720px) { .weapons { bottom: 24px; gap: 12px; } .wbtn { width: 64px; height: 64px; } }`;
+  try {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(css);
+    root.adoptedStyleSheets = [sheet];
+  } catch {
+    const st = document.createElement('style');
+    st.textContent = css;
+    root.appendChild(st);
+  }
+  const h = (tag, props, ...kids) => {
+    const n = document.createElement(tag);
+    for (const k in props || {}) k === 'text' ? (n.textContent = props[k]) : n.setAttribute(k, props[k]);
+    n.append(...kids);
+    return n;
+  };
+  const wbtn = (w, key, name, active) => h('button', { class: 'wbtn' + (active ? ' active' : ''), 'data-w': w, title: `${name} (${key})` },
+    h('span', { class: 'key', text: key }), h('canvas'), h('span', { class: 'wname', text: name }), h('span', { class: 'cd' }));
+  root.append(
+    h('canvas', { class: 'game' }),
+    h('div', { class: 'weapons' }, wbtn('swing', '1', 'Swing'), wbtn('shoot', '2', 'Shoot', true), wbtn('dash', '3', 'Dash')),
+    h('div', { class: 'panel hidden' }, h('h2'), h('p'), h('div', { class: 'btns' }), h('div', { class: 'hint' }))
+  );
   const canvas = root.querySelector('canvas.game');
   const ctx = canvas.getContext('2d');
   const weaponsEl = root.querySelector('.weapons');
@@ -61,7 +72,7 @@
   function resize() {
     W = window.innerWidth;
     H = window.innerHeight;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = lowFx ? 1 : Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -74,8 +85,8 @@
   }
 
   const prefs = { sound: true };
-
-  /* ---------- sound ---------- */
+  const reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  let lowFx = false, slowT = 0, pageDark = false;
 
   let audio = null;
   function sfx(freq, dur, type = 'square', vol = 0.05, slide = 0) {
@@ -94,7 +105,7 @@
       o.connect(g).connect(audio.destination);
       o.start(t);
       o.stop(t + dur + 0.02);
-    } catch (e) { /* no audio */ }
+    } catch {}
   }
   const SND = {
     shoot: () => sfx(880, 0.05, 'square', 0.02, -300),
@@ -106,11 +117,8 @@
     friendly: () => sfx(180, 0.25, 'sawtooth', 0.06, 120),
     wave: () => { [392, 523, 659].forEach((f, i) => setTimeout(() => sfx(f, 0.12, 'square', 0.04), i * 90)); },
     clear: () => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => sfx(f, 0.14, 'triangle', 0.06), i * 100)); },
-    dead: () => { [392, 330, 262, 196].forEach((f, i) => setTimeout(() => sfx(f, 0.22, 'sawtooth', 0.05), i * 160)); },
-    save: () => sfx(1200, 0.08, 'triangle', 0.05)
+    dead: () => { [392, 330, 262, 196].forEach((f, i) => setTimeout(() => sfx(f, 0.22, 'sawtooth', 0.05), i * 160)); }
   };
-
-  /* ---------- pixel sprites ---------- */
 
   const PALETTES = {
     necessary: { body: '#ecc679', edge: '#c2913f', chip: '#6b3e1d' },
@@ -169,20 +177,6 @@
 
   const SPRITES = {};
   ['necessary', 'chaser', 'shooter', 'boss'].forEach(k => { SPRITES[k] = makeSprite(k); });
-
-  function paintIcon(cv) {
-    const g = cv.getContext('2d');
-    g.imageSmoothingEnabled = false;
-    g.clearRect(0, 0, 16, 16);
-    g.drawImage(SPRITES.chaser.img, 1, 1);
-    g.strokeStyle = '#c00';
-    g.lineWidth = 2;
-    g.beginPath();
-    g.moveTo(2, 2); g.lineTo(14, 14);
-    g.stroke();
-  }
-
-  /* ---------- pixel icons ---------- */
 
   const ICON_MAPS = {
     hp: { pal: { R: '#e53935', D: '#9a1b1b', W: '#ffcdd2' }, rows: [
@@ -283,8 +277,6 @@
     }
   }
 
-  /* ---------- game state ---------- */
-
   const BASE = {
     hp: 100,
     speed: 230,
@@ -308,7 +300,6 @@
   let enemies = [], bullets = [], powerups = [], particles = [], floaters = [];
   let spawnQueue = [], spawnTimer = 0, waveInfo = null, countdown = 0, firstHalf = [];
   let shake = 0, flashRed = 0, flashes = [], rings = [], hitStop = 0, whiteFlash = 0, fxT = 0;
-  let loadedThisWave = 0, domainsThisWave = new Set();
   let idleHintT = 0;
   let weapon = 'shoot';
   const cds = { swing: 0, shoot: 0, dash: 0 };
@@ -340,8 +331,6 @@
       fireRate: 1 + 0.05 * (w - 1)
     };
   }
-
-  /* ---------- input ---------- */
 
   const keys = {};
   const mouse = { x: 0, y: 0, down: false, inside: false };
@@ -402,8 +391,6 @@
   }, { passive: false });
   canvas.addEventListener('touchend', e => { if (!e.touches.length) touch.active = false; });
 
-  /* ---------- in-page panel ---------- */
-
   function showPanel(title, msg, buttons, hint, bad) {
     const h = panel.querySelector('h2');
     h.textContent = title;
@@ -439,7 +426,10 @@
     }
   }
 
-  function setStatus() {}
+  const OBST_HP = 5;
+  const CELL = 20;
+  let obstacles = [];
+  const nav = { cols: 0, rows: 0, blocked: null, dist: null, t: 0 };
 
   let lastBadge = '';
   function updateBadge() {
@@ -447,15 +437,8 @@
     const text = state === 'dead' || !running ? '' : String(n);
     if (text === lastBadge) return;
     lastBadge = text;
-    if (hasChrome) { try { chrome.runtime.sendMessage({ cc: 'badge', text }).catch(() => {}); } catch (e) { /* ignore */ } }
+    if (hasChrome) { try { chrome.runtime.sendMessage({ cc: 'badge', text }).catch(() => {}); } catch {} }
   }
-
-  /* ---------- page obstacles ---------- */
-
-  const OBST_HP = 5;
-  const CELL = 20;
-  let obstacles = [];
-  const nav = { cols: 0, rows: 0, blocked: null, dist: null, t: 0 };
 
   const CONTROL_SEL = 'button, input:not([type=hidden]), textarea, select, [role="button"], [role="tab"], [role="checkbox"], [role="switch"], [role="searchbox"], [role="textbox"], [role="combobox"]';
   const MEDIA_SEL = 'img, video, iframe, svg, canvas, picture, embed, object';
@@ -625,7 +608,7 @@
     }
     let dx = e.x - e.homeX, dy = e.y - e.homeY;
     if (e.hitFlash > 0) { dx += rand(-3, 3); dy += rand(-3, 3); }
-    e.clone.style.setProperty('translate', `${Math.round(dx)}px ${Math.round(dy)}px`);
+    e.clone.style.setProperty('transform', `translate(${Math.round(dx)}px, ${Math.round(dy)}px)`);
   }
 
   function restoreElements() {
@@ -699,7 +682,7 @@
         { transform: 'translate(0, 0)' }, { transform: 'translate(-3px, 1px)' }, { transform: 'translate(3px, -1px)' },
         { transform: 'translate(-1px, 2px)' }, { transform: 'translate(0, 0)' }
       ], { duration: 140, composite: 'add' });
-    } catch (e) { /* ignore */ }
+    } catch {}
     if (o.hp <= 0) breakObstacle(o);
   }
 
@@ -845,8 +828,6 @@
     return { x: dx / d, y: dy / d };
   }
 
-  /* ---------- game flow ---------- */
-
   function clearField() {
     enemies = []; bullets = []; powerups = []; particles = []; floaters = []; spawnQueue = []; firstHalf = []; countdown = 0; flashes = []; rings = []; hitStop = 0; whiteFlash = 0;
     slashes = []; ghosts = []; lasers = [];
@@ -863,23 +844,6 @@
     player = newPlayer();
     state = 'idle';
     paused = false;
-    setStatus('Done');
-    updateBadge();
-  }
-
-  function loadFrom(save) {
-    stacks = {
-      hp: Math.max(0, save.stacks?.hp | 0),
-      spd: Math.max(0, save.stacks?.spd | 0),
-      dmg: Math.max(0, save.stacks?.dmg | 0)
-    };
-    wave = Math.max(1, save.wave | 0);
-    score = Math.max(0, save.score | 0);
-    clearField();
-    player = newPlayer();
-    state = 'idle';
-    paused = false;
-    setStatus('Done');
     updateBadge();
   }
 
@@ -893,8 +857,6 @@
       spawnQueue = [];
       countdown = 3;
       spawnTimer = 0;
-      loadedThisWave = 0;
-      domainsThisWave = new Set();
       state = 'wave';
       paused = false;
       player.inv = 1;
@@ -922,8 +884,6 @@
     }
     countdown = 3;
     spawnTimer = 0;
-    loadedThisWave = 0;
-    domainsThisWave = new Set();
     state = 'wave';
     paused = false;
     player.inv = 1;
@@ -942,7 +902,7 @@
       SND.clear();
       score += 500;
       const site = location.hostname.replace(/^www\./, '') || 'local file';
-      if (hasChrome) { try { chrome.runtime.sendMessage({ cc: 'conquered', host: site }).catch(() => {}); } catch (e) { /* ignore */ } }
+      if (hasChrome) { try { chrome.runtime.sendMessage({ cc: 'conquered', host: site }).catch(() => {}); } catch {} }
       floaters.push({ x: W / 2, y: H * 0.35, text: `${site.toUpperCase()} CONQUERED  +500`, color: '#1f8a17', life: 2.4, max: 2.4, big: true });
       updateBadge();
       setTimeout(() => {
@@ -967,7 +927,6 @@
     const heal = Math.round(player.maxHp * 0.15);
     player.hp = Math.min(player.maxHp, player.hp + heal);
     SND.clear();
-    setStatus(`Done. Blocked ${loadedThisWave} cookies from ${domainsThisWave.size} domains.`);
     floaters.push({ x: W / 2, y: H * 0.35, text: `WAVE ${wave} CLEARED  +${bonus}`, color: '#1f8a17', life: 2.4, max: 2.4, big: true });
     wave++;
     updateBadge();
@@ -993,8 +952,6 @@
       ], '', true);
     }, 900);
   }
-
-  /* ---------- spawning ---------- */
 
   function spawnElement(spec) {
     const el = spec.el, r = el.getBoundingClientRect();
@@ -1051,19 +1008,13 @@
     } else {
       Object.assign(e, { r: 46, scale: 7, hp: 420 * wp.hp, speed: 45 * wp.spd, dmg: 13 * wp.dmg, touch: 35 * wp.dmg, bulletSpeed: 150, shots: 0, shotT: 0, spinA: 0,
         phase: 'orbit', phaseT: 3, orbitA: 0, orbitDir: 1, windup: 0, chargesLeft: 0, fadeT: 0, trailT: 0, variant: pick(BOSS_VARIANTS), fireCd: 1.2 });
-      setStatus(`Warning: ${info.n} from ${info.d} is regenerating itself...`);
     }
     e.maxHp = e.hp;
     enemies.push(e);
-    loadedThisWave++;
-    domainsThisWave.add(info.d);
-    if (kind !== 'boss') setStatus(`Waiting for ${info.d}...`);
     rings.push({ x, y, r: 2, rmax: e.r * 2.6, color: RING_COLORS[kind], life: 0.75, max: 0.75, w: 3 });
     if (!spec.quiet) sfx(300 + Math.random() * 200, 0.05, 'triangle', 0.02, 200);
     return e;
   }
-
-  /* ---------- combat helpers ---------- */
 
   function hurtPlayer(dmg, srcX, srcY, ignoreInv) {
     if (state !== 'wave') return;
@@ -1124,7 +1075,6 @@
     if (e.kind === 'necessary') {
       score = Math.max(0, score - 150);
       floaters.push({ x: e.x, y: e.y - 20, text: 'SITE BROKE! -150', color: '#d32f2f', life: 1.4, max: 1.4 });
-      setStatus(`Oops: deleting ${e.name} logged you out of ${e.domain}.`);
       SND.friendly();
       return;
     }
@@ -1170,9 +1120,6 @@
   }
 
   const POWER_COLORS = { hp: '#d32f2f', spd: '#e0a000', dmg: '#e65100' };
-  const POWER_LABEL = { hp: '+HP', spd: 'SPD', dmg: 'DMG' };
-
-  /* ---------- update ---------- */
 
   function update(dt) {
     if (hitStop > 0) { hitStop -= dt; dt *= 0.12; }
@@ -1217,7 +1164,8 @@
       p.vx *= 0.92; p.vy = p.vy * 0.92 + 200 * dt;
     }
     particles = particles.filter(p => p.life > 0);
-    if (particles.length > 900) particles.splice(0, particles.length - 900);
+    const cap = lowFx ? 250 : 900;
+    if (particles.length > cap) particles.splice(0, particles.length - cap);
     for (const f of flashes) f.life -= dt;
     flashes = flashes.filter(f => f.life > 0);
     for (const r of rings) r.life -= dt;
@@ -1717,8 +1665,6 @@
     powerups = powerups.filter(pu => pu.life > 0);
   }
 
-  /* ---------- render ---------- */
-
   function text(str, x, y, size, color, align = 'center', font = 'CCSilk') {
     ctx.font = `${size}px ${font}, monospace`;
     ctx.textAlign = align;
@@ -2096,7 +2042,7 @@
   }
 
   function drawLighting() {
-    ctx.fillStyle = state === 'wave' ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.12)';
+    ctx.fillStyle = pageDark ? (state === 'wave' ? 'rgba(0,0,0,.22)' : 'rgba(0,0,0,.1)') : (state === 'wave' ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.12)');
     ctx.fillRect(0, 0, W, H);
     ctx.save();
     for (const lz of lasers) {
@@ -2167,6 +2113,7 @@
   }
 
   function drawGlowPass() {
+    if (lowFx) return;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const e of enemies) {
@@ -2220,7 +2167,7 @@
     if (state === 'boot' || !player) return;
 
     ctx.save();
-    if (shake > 0) ctx.translate(rand(-shake, shake) * 0.5, rand(-shake, shake) * 0.5);
+    if (shake > 0 && !reducedMotion) ctx.translate(rand(-shake, shake) * 0.5, rand(-shake, shake) * 0.5);
 
     drawLighting();
     drawHud();
@@ -2264,7 +2211,7 @@
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, W, H);
     }
-    if (whiteFlash > 0) {
+    if (whiteFlash > 0 && !reducedMotion) {
       ctx.fillStyle = `rgba(255,236,179,${whiteFlash * 0.45})`;
       ctx.fillRect(0, 0, W, H);
     }
@@ -2290,8 +2237,6 @@
     }
   }
 
-  /* ---------- main loop & lifecycle ---------- */
-
   let running = false;
   let last = performance.now();
   let rafId = 0;
@@ -2300,8 +2245,13 @@
 
   function frame(now) {
     if (!running) return;
-    const dt = Math.min(0.05, (now - last) / 1000);
+    const raw = (now - last) / 1000;
+    const dt = Math.min(0.05, raw);
     last = now;
+    if (!lowFx && raw < 0.2) {
+      slowT = raw > 0.028 ? slowT + raw : Math.max(0, slowT - raw * 0.5);
+      if (slowT > 3) { lowFx = true; resize(); }
+    }
     remeasureT -= dt;
     if (remeasureT <= 0) { remeasureT = 1; measureObstacles(); }
     update(dt);
@@ -2321,13 +2271,23 @@
       const face = new FontFace('CCSilk', buf);
       await face.load();
       document.fonts.add(face);
-    } catch (e) { /* fall back to monospace */ }
+    } catch {}
+  }
+
+  function isPageDark() {
+    for (const el of [document.body, document.documentElement]) {
+      if (!el) continue;
+      const [r, g, b] = hexRgb(getComputedStyle(el).backgroundColor);
+      if (visibleAlpha(getComputedStyle(el).backgroundColor) > 0.5) return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.4;
+    }
+    return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && getComputedStyle(document.documentElement).colorScheme.includes('dark'));
   }
 
   function start(opts) {
     if (running) return status();
     if (opts && typeof opts.sound === 'boolean') prefs.sound = opts.sound;
     mode = opts && opts.mode === 'elements' ? 'elements' : 'cookies';
+    pageDark = isPageDark();
     elementSpecs = [];
     if (mode === 'elements') {
       const els = detectEnemyElements();
@@ -2344,7 +2304,7 @@
     savedOverflow.body = document.body ? document.body.style.overflow : '';
     document.documentElement.style.overflow = 'hidden';
     if (document.body) document.body.style.overflow = 'hidden';
-    (document.body || document.documentElement).appendChild(host);
+    document.documentElement.appendChild(host);
     running = true;
     resize();
     player = newPlayer();
@@ -2374,7 +2334,7 @@
     host.remove();
     document.documentElement.style.overflow = savedOverflow.html;
     if (document.body) document.body.style.overflow = savedOverflow.body;
-    if (hasChrome) { try { chrome.runtime.sendMessage({ cc: 'badge', text: '' }).catch(() => {}); } catch (e) { /* ignore */ } }
+    if (hasChrome) { try { chrome.runtime.sendMessage({ cc: 'badge', text: '' }).catch(() => {}); } catch {} }
     if (hasChrome && chrome.runtime.onMessage) chrome.runtime.onMessage.removeListener(onMessage);
     window.__cookieCrusher = null;
   }

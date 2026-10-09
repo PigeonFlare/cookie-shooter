@@ -1,7 +1,7 @@
 const $ = id => document.getElementById(id);
 let tabId = null;
 let blocked = null;
-const BLOCKED_MSG = 'This page can\'t be attacked. Chrome blocks extensions on its own pages and the Web Store.';
+const BLOCKED_MSG = 'This page can\'t be attacked. Browsers block extensions on their own pages and add-on stores.';
 
 function show(st, err) {
   $('start').disabled = !!err;
@@ -83,7 +83,7 @@ $('sound').onchange = async () => {
 (async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   tabId = tab && tab.id;
-  if (!tab || /^(chrome|edge|brave|about|view-source|devtools|chrome-extension|chrome-search):/.test(tab.url || '') || /chromewebstore\.google\.com|chrome\.google\.com\/webstore/.test(tab.url || '')) blocked = BLOCKED_MSG;
+  if (!tab || /^(chrome|edge|brave|opera|vivaldi|about|view-source|devtools|chrome-extension|chrome-search|moz-extension|resource):/.test(tab.url || '') || /chromewebstore\.google\.com|chrome\.google\.com\/webstore|microsoftedge\.microsoft\.com\/addons|addons\.mozilla\.org/.test(tab.url || '')) blocked = BLOCKED_MSG;
   const { sound } = await chrome.storage.local.get('sound');
   if (typeof sound === 'boolean') $('sound').checked = sound;
   await refresh();

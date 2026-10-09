@@ -38,8 +38,6 @@
     }
   }
 
-  /* ---------- storage ---------- */
-
   function storeGet(key) {
     try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; }
   }
@@ -47,12 +45,10 @@
     try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; }
   }
   function storeDel(key) {
-    try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
+    try { localStorage.removeItem(key); } catch {}
   }
 
   const prefs = Object.assign({ sound: true }, storeGet(PREF_KEY) || {});
-
-  /* ---------- sound ---------- */
 
   let audio = null;
   function sfx(freq, dur, type = 'square', vol = 0.05, slide = 0) {
@@ -71,7 +67,7 @@
       o.connect(g).connect(audio.destination);
       o.start(t);
       o.stop(t + dur + 0.02);
-    } catch (e) { /* no audio */ }
+    } catch {}
   }
   const SND = {
     shoot: () => sfx(880, 0.05, 'square', 0.02, -300),
@@ -86,8 +82,6 @@
     dead: () => { [392, 330, 262, 196].forEach((f, i) => setTimeout(() => sfx(f, 0.22, 'sawtooth', 0.05), i * 160)); },
     save: () => sfx(1200, 0.08, 'triangle', 0.05)
   };
-
-  /* ---------- pixel sprites ---------- */
 
   const PALETTES = {
     necessary: { body: '#ecc679', edge: '#c2913f', chip: '#6b3e1d' },
@@ -160,8 +154,6 @@
   }
   paintIcon($('extIcon'));
   paintIcon($('popIcon'));
-
-  /* ---------- pixel icons ---------- */
 
   const ICON_MAPS = {
     hp: { pal: { R: '#e53935', D: '#9a1b1b', W: '#ffcdd2' }, rows: [
@@ -266,8 +258,6 @@
     extBtn.classList.toggle('pulse-soft', show && state === 'wave');
   }
 
-  /* ---------- game state ---------- */
-
   const BASE = {
     hp: 100,
     speed: 230,
@@ -324,8 +314,6 @@
     };
   }
 
-  /* ---------- input ---------- */
-
   const keys = {};
   const mouse = { x: 0, y: 0, down: false, inside: false };
   const touch = { active: false, x: 0, y: 0, dashReq: false };
@@ -375,8 +363,6 @@
     touch.x = p.x; touch.y = p.y;
   }, { passive: false });
   canvas.addEventListener('touchend', e => { if (!e.touches.length) touch.active = false; });
-
-  /* ---------- popup / UI ---------- */
 
   function openPopup(msg, cls) {
     if (state === 'boot' || state === 'dead') return;
@@ -491,8 +477,6 @@
     badge.textContent = n > 999 ? '999+' : String(n);
     badge.classList.toggle('zero', n === 0);
   }
-
-  /* ---------- page obstacles ---------- */
 
   const OBST_HP = 5;
   const CELL = 20;
@@ -688,8 +672,6 @@
     return { x: dx / d, y: dy / d };
   }
 
-  /* ---------- game flow ---------- */
-
   function clearField() {
     enemies = []; bullets = []; powerups = []; particles = []; floaters = []; spawnQueue = []; firstHalf = []; countdown = 0; flashes = []; rings = []; hitStop = 0; whiteFlash = 0;
     slashes = []; ghosts = []; lasers = [];
@@ -801,8 +783,6 @@
     }, 900);
   }
 
-  /* ---------- spawning ---------- */
-
   function spawn(spec, atX, atY) {
     const kind = spec.kind;
     const info = pick(DB[kind]);
@@ -843,8 +823,6 @@
     if (!spec.quiet) sfx(300 + Math.random() * 200, 0.05, 'triangle', 0.02, 200);
     return e;
   }
-
-  /* ---------- combat helpers ---------- */
 
   function hurtPlayer(dmg, srcX, srcY, ignoreInv) {
     if (state !== 'wave') return;
@@ -950,9 +928,6 @@
   }
 
   const POWER_COLORS = { hp: '#d32f2f', spd: '#e0a000', dmg: '#e65100' };
-  const POWER_LABEL = { hp: '+HP', spd: 'SPD', dmg: 'DMG' };
-
-  /* ---------- update ---------- */
 
   function update(dt) {
     if (hitStop > 0) { hitStop -= dt; dt *= 0.12; }
@@ -1496,8 +1471,6 @@
     powerups = powerups.filter(pu => pu.life > 0);
   }
 
-  /* ---------- render ---------- */
-
   function text(str, x, y, size, color, align = 'center', font = 'Silkscreen') {
     ctx.font = `${size}px ${font}, monospace`;
     ctx.textAlign = align;
@@ -2028,8 +2001,6 @@
     }
   }
 
-  /* ---------- main loop ---------- */
-
   let last = performance.now();
   let popupRefreshT = 0;
   function frame(now) {
@@ -2042,8 +2013,6 @@
     if (popupRefreshT <= 0 && !popup.classList.contains('hidden')) { popupRefreshT = 0.25; refreshPopup(); }
     requestAnimationFrame(frame);
   }
-
-  /* ---------- boot: pretend it's a slow 2009 connection ---------- */
 
   function boot() {
     resize();
@@ -2077,6 +2046,6 @@
   }
 
   window.addEventListener('resize', resize);
-  try { document.fonts.load('8px Silkscreen'); } catch (e) { /* ignore */ }
+  try { document.fonts.load('8px Silkscreen'); } catch {}
   boot();
 })();

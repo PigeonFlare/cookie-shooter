@@ -216,7 +216,6 @@ html, body {
 
 .hidden { display: none !important; }
 
-/* Google, circa 2009 */
 #googlePage {
   position: absolute;
   inset: 0;
@@ -279,7 +278,6 @@ html, body {
 .gfoot { text-align: center; padding: 0 0 28px; font-size: 13px; }
 .gcopy { margin-top: 10px; font-size: 11px; color: #666; }
 
-/* Attack buttons */
 #weapons {
   position: absolute;
   left: 50%;
@@ -334,7 +332,6 @@ html, body {
   pointer-events: none;
 }
 
-/* Status bubble */
 #status {
   position: absolute;
   left: 0;
@@ -355,7 +352,6 @@ html, body {
   z-index: 1;
 }
 
-/* Extension popup */
 #popup {
   position: absolute;
   top: 72px;
@@ -432,7 +428,6 @@ html, body {
 .lg.cha { background: #b71c1c; }
 .lg.sho { background: #5e35b1; }
 
-/* Aw, Snap! */
 #awsnap {
   position: absolute;
   inset: 0;
