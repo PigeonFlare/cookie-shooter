@@ -955,7 +955,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
 
   function spawnElement(spec) {
     const el = spec.el, r = el.getBoundingClientRect();
-    const n = spec.count, nerf = Math.max(1, n / 3);
+    const nerf = spec.kind === 'shooter' ? Math.max(1, spec.shooters / 5) : 1;
     const hw = r.width / 2, hh = r.height / 2;
     const boss = spec.kind === 'boss';
     const e = {
@@ -965,12 +965,16 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       shots: 0, shotT: 0, spinA: rand(0, 6.3), orbitA: rand(0, 6.3), orbitDir: Math.random() < 0.5 ? 1 : -1
     };
     if (boss) {
-      Object.assign(e, { hp: 320, speed: 50, dmg: 13, touch: 30, bulletSpeed: 150, phase: 'orbit', phaseT: 3, windup: 0, chargesLeft: 0, fadeT: 0, trailT: 0,
+      Object.assign(e, { hp: 450, speed: 60, dmg: 13, touch: 30, bulletSpeed: 150, phase: 'orbit', phaseT: 3, windup: 0, chargesLeft: 0, fadeT: 0, trailT: 0,
         variant: pick(BOSS_VARIANTS), fireCd: 1.5 });
+    } else if (spec.kind === 'chaser') {
+      Object.assign(e, { hp: clamp(Math.sqrt(r.width * r.height) * 0.8, 25, 110), speed: BASE.speed * rand(0.9, 1.15), dmg: 20, touch: 22 });
     } else {
-      Object.assign(e, { hp: clamp(Math.sqrt(r.width * r.height) * 0.6, 20, 90), speed: 105 * rand(0.85, 1.15) * Math.max(0.6, 1 - n * 0.01), dmg: 11, touch: 18,
-        keep: rand(170, 260), pattern: pick(PATTERNS).id, bulletSpeed: 330 * Math.max(0.75, 1 - n * 0.006), fireCd: rand(0.4, 2.5) * nerf });
+      Object.assign(e, { hp: clamp(Math.sqrt(r.width * r.height) * 0.9, 30, 130), speed: BASE.speed * rand(0.75, 1.05), dmg: 12, touch: 18,
+        keep: rand(220, 320), pattern: pick(PATTERNS).id, bulletSpeed: BASE.speed * rand(1.35, 1.9), fireCd: rand(0.3, 1.5) * nerf });
     }
+    e.aimLead = Math.random() < 0.5;
+    e.crowd = spec.count > 12;
     e.maxHp = e.hp;
     enemies.push(e);
     rings.push({ x: e.x, y: e.y, r: 2, rmax: Math.max(hw, hh) * 1.6, color: RING_COLORS[e.kind], life: 0.75, max: 0.75, w: 3 });
@@ -1009,6 +1013,8 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       Object.assign(e, { r: 46, scale: 7, hp: 420 * wp.hp, speed: 45 * wp.spd, dmg: 13 * wp.dmg, touch: 35 * wp.dmg, bulletSpeed: 150, shots: 0, shotT: 0, spinA: 0,
         phase: 'orbit', phaseT: 3, orbitA: 0, orbitDir: 1, windup: 0, chargesLeft: 0, fadeT: 0, trailT: 0, variant: pick(BOSS_VARIANTS), fireCd: 1.2 });
     }
+    e.aimLead = Math.random() < 0.5;
+    if (e.bulletSpeed && kind === 'shooter') e.bulletSpeed *= rand(0.85, 1.2);
     e.maxHp = e.hp;
     enemies.push(e);
     rings.push({ x, y, r: 2, rmax: e.r * 2.6, color: RING_COLORS[kind], life: 0.75, max: 0.75, w: 3 });
@@ -1414,12 +1420,12 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
         e.fireCd = rand(0.85, 1.25) / fr;
         return;
       case 'heavy':
-        enemyShoot(e, aim, e.bulletSpeed * rand(0.95, 1.05), e.dmg * 1.8, col, { lead: true, r: 8 });
+        enemyShoot(e, aim, e.bulletSpeed * rand(0.95, 1.05), e.dmg * 1.8, col, { lead: e.aimLead, r: 8 });
         e.fireCd = rand(1.1, 1.5) / fr;
         sfx(320, 0.12, 'square', 0.04, -180);
         return;
       case 'laser':
-        fireLaser(e, aim, e.dmg * 2.2, col, 14);
+        fireLaser(e, e.aimLead ? leadAim(e, 700) : aim, e.dmg * 2.2, col, 14);
         e.fireCd = rand(2.6, 3.1) / fr;
         return;
     }
@@ -1434,7 +1440,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       enemyShoot(e, e.burstA, e.burstSpeed, e.dmg, BOSS_COLORS[e.variant]);
       e.shotT = 0.08;
     } else {
-      enemyShoot(e, Math.atan2(player.y - e.y, player.x - e.x), e.bulletSpeed * rand(1.15, 1.25), e.dmg, PATTERN_COLORS[e.pattern], { lead: true });
+      enemyShoot(e, Math.atan2(player.y - e.y, player.x - e.x), e.bulletSpeed * rand(1.15, 1.25), e.dmg, PATTERN_COLORS[e.pattern], { lead: e.aimLead });
       e.shotT = 0.11;
     }
     SND.enemyShot();
@@ -1493,9 +1499,15 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
         tvy = Math.sin(e.wanderA) * e.speed;
         steer = 1.5;
       } else if (e.kind === 'chaser') {
-        const wob = Math.sin(e.t * 3 + e.wanderA) * 0.35;
-        tvx = (nx - ny * wob) * e.speed;
-        tvy = (ny + nx * wob) * e.speed;
+        let cx = nx, cy = ny;
+        if (e.aimLead && p.dashT <= 0) {
+          const t = Math.min(0.9, d / (e.speed + 1));
+          const qx = p.x + p.vx * t - e.x, qy = p.y + p.vy * t - e.y, qd = hyp(qx, qy) || 1;
+          cx = qx / qd; cy = qy / qd;
+        }
+        const wob = Math.sin(e.t * 3 + e.wanderA) * (e.aimLead ? 0.15 : 0.35);
+        tvx = (cx - cy * wob) * e.speed;
+        tvy = (cy + cx * wob) * e.speed;
         steer = 2.2;
       } else if (e.kind === 'shooter') {
         const aim = Math.atan2(dy, dx);
@@ -1503,8 +1515,9 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
         const qw = W / 2, qh = H / 2, pad = e.r + 10;
         e.orbitA += dt * e.orbitDir * 0.5;
         if (Math.random() < dt * 0.3) e.orbitDir = -e.orbitDir;
-        let gx = clamp(p.x + Math.cos(e.orbitA) * e.keep, qx + pad, qx + qw - pad);
-        let gy = clamp(p.y + Math.sin(e.orbitA) * e.keep, qy + pad, qy + qh - pad);
+        const fx = e.aimLead ? p.x + p.vx * 0.5 : p.x, fy = e.aimLead ? p.y + p.vy * 0.5 : p.y;
+        let gx = clamp(fx + Math.cos(e.orbitA) * e.keep, qx + pad, qx + qw - pad);
+        let gy = clamp(fy + Math.sin(e.orbitA) * e.keep, qy + pad, qy + qh - pad);
         if (hyp(gx - p.x, gy - p.y) < e.keep * 0.7) {
           gx = p.x - qx < qw / 2 ? qx + qw - pad : qx + pad;
           gy = p.y - qy < qh / 2 ? qy + qh - pad : qy + pad;
@@ -1598,7 +1611,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       for (let j = i + 1; j < enemies.length; j++) {
         const b = enemies[j];
         if (b.spawnT > 0) continue;
-        const dx = b.x - a.x, dy = b.y - a.y, d = hyp(dx, dy), min = (a.r + b.r) * 0.8;
+        const dx = b.x - a.x, dy = b.y - a.y, d = hyp(dx, dy), min = (a.r + b.r) * 0.8 + (a.el || b.el ? (a.kind === 'shooter' && b.kind === 'shooter' ? 60 : 24) : 0);
         if (d > 0 && d < min) {
           const push = (min - d) / 2, ux = dx / d, uy = dy / d;
           a.x -= ux * push; a.y -= uy * push;
@@ -1677,7 +1690,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
 
   function drawElementEnemy(e) {
     const k = e.spawnT > 0 ? 1 - e.spawnT / 0.75 : 1;
-    const col = e.kind === 'boss' ? (BOSS_COLORS[e.variant] || '#aa00ff') : PATTERN_COLORS[e.pattern] || '#e0157a';
+    const col = e.kind === 'boss' ? (BOSS_COLORS[e.variant] || '#aa00ff') : e.kind === 'chaser' ? '#ff3d00' : PATTERN_COLORS[e.pattern] || '#e0157a';
     const pulse = 0.55 + Math.sin(e.t * 6) * 0.25;
     ctx.save();
     ctx.globalAlpha = k * pulse;
@@ -1695,7 +1708,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     }
     ctx.restore();
     if (e.spawnT > 0) return;
-    if (e.nerf > 4 && e.kind !== 'boss' && e.hp >= e.maxHp) return;
+    if (e.crowd && e.kind !== 'boss' && e.hp >= e.maxHp) return;
     const fs = e.kind === 'boss' ? 10 : 8;
     const label = e.kind === 'boss' ? `BOSS ${e.name}` : e.name;
     ctx.font = `${fs}px CCSilk, monospace`;
@@ -2294,7 +2307,10 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       if (els.length) {
         let bossEl = null;
         if (els.length <= 6) bossEl = els.reduce((a, b) => { const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(); return rb.width * rb.height > ra.width * ra.height ? b : a; });
-        elementSpecs = els.map(el => ({ el, kind: el === bossEl ? 'boss' : 'shooter', count: els.length }));
+        const rest = els.filter(el => el !== bossEl);
+        const roles = rest.map((el, i) => (rest.length >= 2 && i === 0) ? 'chaser' : (rest.length >= 2 && i === 1) ? 'shooter' : Math.random() < 0.4 ? 'chaser' : 'shooter');
+        const shooters = roles.filter(k => k === 'shooter').length;
+        elementSpecs = els.map(el => ({ el, kind: el === bossEl ? 'boss' : roles[rest.indexOf(el)], count: els.length, shooters }));
       } else {
         mode = 'cookies';
       }
