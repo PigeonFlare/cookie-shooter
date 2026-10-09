@@ -15,7 +15,7 @@ Every cookie a page tries to load is an enemy. You are the mouse cursor, flying 
 | Enter | Start the next wave |
 | Esc | Open the extension menu (pauses) |
 
-Swing hits everything in an arc in front of you and cuts through enemy bullets. Shoot fires big blue bolts. Dash is a quick invulnerable burst in the direction your cursor is pointing, with a short cooldown.
+Swing hits everything in an arc in front of you and cuts through enemy bullets. Shoot fires big blue bolts. Dash is a quick invulnerable burst in the direction your cursor is pointing that damages every enemy you pass through, with a short cooldown.
 
 On a phone, touch and drag to fly. Swing and shoot auto-target the nearest tracker; with dash selected, each new tap dashes toward your finger.
 

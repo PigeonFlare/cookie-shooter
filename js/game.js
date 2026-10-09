@@ -298,7 +298,7 @@
     return {
       x: W / 2, y: H * 0.62, vx: 0, vy: 0, r: 9,
       hp: maxHpFor(stacks.hp), maxHp: maxHpFor(stacks.hp),
-      angle: -Math.PI / 2, inv: 0, dashT: 0, dashVx: 0, dashVy: 0
+      angle: -Math.PI / 2, inv: 0, dashT: 0, dashVx: 0, dashVy: 0, dashHits: new Set()
     };
   }
 
@@ -610,13 +610,13 @@
     if (kind === 'necessary') {
       Object.assign(e, { r: 18, scale: 3, hp: 30, speed: 38 * rand(0.8, 1.2) });
     } else if (kind === 'chaser') {
-      Object.assign(e, { r: 13, scale: 2, hp: 18 * wp.hp, speed: BASE.speed * rand(1.04, 1.16) * Math.min(1.3, 1 + 0.02 * (wave - 1)), dmg: 8 * wp.dmg });
+      Object.assign(e, { r: 13, scale: 2, hp: 18 * wp.hp, speed: BASE.speed * rand(1.04, 1.16) * Math.min(1.3, 1 + 0.02 * (wave - 1)), dmg: 20 * wp.dmg, touch: 20 * wp.dmg });
     } else if (kind === 'shooter') {
-      Object.assign(e, { r: 18, scale: 3, hp: 28 * wp.hp, speed: 70 * wp.spd * rand(0.8, 1.2), dmg: 5 * wp.dmg, keep: rand(200, 300),
+      Object.assign(e, { r: 18, scale: 3, hp: 28 * wp.hp, speed: 70 * wp.spd * rand(0.8, 1.2), dmg: 11 * wp.dmg, touch: 18 * wp.dmg, keep: rand(200, 300),
         pattern: pick(PATTERNS.filter(pt => pt.from <= wave)).id, move: pick(['kite', 'orbit', 'hop', 'drift']),
         orbitA: rand(0, 6.3), orbitDir: Math.random() < 0.5 ? 1 : -1, hopT: 0, hopX: x, hopY: y, homeX: x, homeY: y, bulletSpeed: 150 * Math.min(1.5, wp.spd), shots: 0, shotT: 0, spinA: rand(0, 6.3) });
     } else {
-      Object.assign(e, { r: 46, scale: 7, hp: 420 * wp.hp, speed: 45 * wp.spd, dmg: 6 * wp.dmg, bulletSpeed: 150, shots: 0, shotT: 0, spinA: 0,
+      Object.assign(e, { r: 46, scale: 7, hp: 420 * wp.hp, speed: 45 * wp.spd, dmg: 13 * wp.dmg, touch: 35 * wp.dmg, bulletSpeed: 150, shots: 0, shotT: 0, spinA: 0,
         phase: 'orbit', phaseT: 3, orbitA: 0, orbitDir: 1, windup: 0, chargesLeft: 0, fadeT: 0, trailT: 0 });
       setStatus(`Warning: ${info.n} from ${info.d} is regenerating itself...`);
     }
@@ -810,6 +810,18 @@
       p.dashT -= dt;
       p.vx = p.dashVx; p.vy = p.dashVy;
       ghosts.push({ x: p.x, y: p.y, angle: p.angle, life: 0.22, max: 0.22 });
+      if (state === 'wave') {
+        const dmg = BASE.damage * dmgMultFor(stacks.dmg) * 1.8;
+        for (const e of enemies) {
+          if (e.dead || e.spawnT > 0 || e.ghost || e.kind === 'necessary' || p.dashHits.has(e)) continue;
+          if (hyp(e.x - p.x, e.y - p.y) < e.r + p.r + 6) {
+            p.dashHits.add(e);
+            const d = hyp(p.dashVx, p.dashVy) || 1;
+            damageEnemy(e, dmg, p.dashVx / d * 260, p.dashVy / d * 260, 0);
+            floaters.push({ x: e.x, y: e.y - 24, text: 'DASH HIT', color: '#1851ce', life: 0.6, max: 0.6 });
+          }
+        }
+      }
     } else {
       const accel = Math.min(1, dt * 12);
       p.vx += (ix * speed - p.vx) * accel;
@@ -875,6 +887,7 @@
       p.dashVx = Math.cos(p.angle) * BASE.dashSpeed;
       p.dashVy = Math.sin(p.angle) * BASE.dashSpeed;
       p.dashT = BASE.dashTime;
+      p.dashHits = new Set();
       p.inv = Math.max(p.inv, BASE.dashTime + 0.08);
       sfx(200, 0.15, 'triangle', 0.05, 500);
     }
@@ -938,7 +951,7 @@
       e.phaseT = 3.4;
       e.laserStage = 0;
       const aim = Math.atan2(player.y - e.y, player.x - e.x);
-      for (let i = -2; i <= 2; i++) fireLaser(e, aim + i * 0.42, e.dmg * 3, '#aa00ff', 20);
+      for (let i = -2; i <= 2; i++) fireLaser(e, aim + i * 0.42, e.dmg * 2.4, '#aa00ff', 20);
     }
     else if (next === 'teleport') { e.phaseT = 1.3; e.fadeT = 0.45; sfx(300, 0.3, 'triangle', 0.05, 900); }
     else if (next === 'summon') {
@@ -992,8 +1005,8 @@
         e.fireCd = rand(3, 3.6) / fr;
         break;
       case 'laser':
-        fireLaser(e, aim, e.dmg * 2.5, col, 14);
-        if (wave >= 8) { fireLaser(e, aim + 0.5, e.dmg * 2.5, col, 14); fireLaser(e, aim - 0.5, e.dmg * 2.5, col, 14); }
+        fireLaser(e, aim, e.dmg * 2.2, col, 14);
+        if (wave >= 8) { fireLaser(e, aim + 0.5, e.dmg * 2.2, col, 14); fireLaser(e, aim - 0.5, e.dmg * 2.2, col, 14); }
         e.fireCd = rand(3.6, 4.4) / fr;
         return;
     }
@@ -1146,7 +1159,7 @@
           if (e.laserStage === 0 && e.phaseT < 2.2) {
             e.laserStage = 1;
             const off = rand(0, Math.PI / 4);
-            for (let i = 0; i < 4; i++) fireLaser(e, off + i * Math.PI / 2, e.dmg * 3, '#d500f9', 20);
+            for (let i = 0; i < 4; i++) fireLaser(e, off + i * Math.PI / 2, e.dmg * 2.4, '#d500f9', 20);
           }
         } else if (e.phase === 'summon') {
           tvx = Math.cos(e.t * 30) * 30; tvy = 0;
@@ -1166,7 +1179,7 @@
 
       if (e.kind !== 'necessary' && !e.ghost && d < e.r + p.r && e.contactCd <= 0) {
         e.contactCd = 0.8;
-        hurtPlayer(e.kind === 'boss' ? e.dmg * 2.5 : e.dmg, e.x, e.y);
+        hurtPlayer(e.touch, e.x, e.y);
         e.vx -= nx * 200; e.vy -= ny * 200;
       } else if (e.kind === 'necessary' && d < e.r + p.r) {
         p.x += nx * 2; p.y += ny * 2;
