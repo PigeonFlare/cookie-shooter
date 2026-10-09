@@ -26,7 +26,7 @@ On a phone, touch and drag to fly. Swing and shoot auto-target the nearest track
 - **Ad networks** (purple tags, like `IDE doubleclick.net` or `uuid2 adnxs.com`) orbit, hop and drift around you while firing spreads, rings, bursts, wavy shots, spirals and lasers. Every enemy bullet is faster than you and aims where you're heading, not where you are. Lasers fire in mirrored pairs and flash a warning line for two seconds first. Every hit costs you between 12 and 25 health.
 - Every fifth wave a **supercookie** shows up (evercookie, zombie cookies, Flash LSOs...). It cycles through orbiting, telegraphed charges, spiral barrages, laser grids, teleports and respawning deleted cookies.
 
-Waves grow in size, speed and damage. Deleted trackers sometimes drop a power-up: a heart for health, a lightning bolt for speed or a sword for damage. Each power-up of the same kind is worth a bit less than the last, so stacking one stat has diminishing returns.
+Each wave starts with the screen dimming for a three-second countdown. Then half the cookies grow into view all at once, and the other half arrive together once only one tracker from the first half is left. Waves grow in size, speed and damage. Deleted trackers sometimes drop a power-up: a heart for health, a lightning bolt for speed or a sword for damage. Each power-up of the same kind is worth a bit less than the last, so stacking one stat has diminishing returns.
 
 ## The page fights back too
 

@@ -289,7 +289,7 @@
   let state = 'boot';
   let paused = false;
   let enemies = [], bullets = [], powerups = [], particles = [], floaters = [];
-  let spawnQueue = [], spawnTimer = 0, waveInfo = null;
+  let spawnQueue = [], spawnTimer = 0, waveInfo = null, countdown = 0, firstHalf = [];
   let shake = 0, flashRed = 0;
   let loadedThisWave = 0, domainsThisWave = new Set();
   let idleHintT = 0;
@@ -487,7 +487,7 @@
   }
 
   function updateBadge() {
-    const n = enemies.filter(e => e.kind !== 'necessary').length + spawnQueue.filter(s => s.kind !== 'necessary').length;
+    const n = enemies.filter(e => e.kind !== 'necessary').length + spawnQueue.filter(s => s.kind !== 'necessary').length + firstHalf.filter(s => s.kind !== 'necessary').length;
     badge.textContent = n > 999 ? '999+' : String(n);
     badge.classList.toggle('zero', n === 0);
   }
@@ -691,7 +691,7 @@
   /* ---------- game flow ---------- */
 
   function clearField() {
-    enemies = []; bullets = []; powerups = []; particles = []; floaters = []; spawnQueue = [];
+    enemies = []; bullets = []; powerups = []; particles = []; floaters = []; spawnQueue = []; firstHalf = []; countdown = 0;
     slashes = []; ghosts = []; lasers = [];
     restoreObstacles();
     for (const k in cds) cds[k] = 0;
@@ -739,8 +739,15 @@
     }
     if (waveInfo.boss) q.splice(Math.floor(q.length * 0.6), 0, { kind: 'boss' });
     q.unshift({ kind: 'necessary' });
-    spawnQueue = q;
-    spawnTimer = 0.4;
+    const half = Math.ceil(q.length / 2);
+    firstHalf = q.slice(0, half);
+    spawnQueue = q.slice(half);
+    if (!firstHalf.some(sp => sp.kind !== 'necessary')) {
+      const i = spawnQueue.findIndex(sp => sp.kind !== 'necessary');
+      if (i >= 0) firstHalf.push(spawnQueue.splice(i, 1)[0]);
+    }
+    countdown = 3;
+    spawnTimer = 0;
     loadedThisWave = 0;
     domainsThisWave = new Set();
     state = 'wave';
@@ -832,7 +839,8 @@
     loadedThisWave++;
     domainsThisWave.add(info.d);
     if (kind !== 'boss') setStatus(`Waiting for ${info.d}...`);
-    sfx(300 + Math.random() * 200, 0.05, 'triangle', 0.02, 200);
+    if (!spec.quiet) sfx(300 + Math.random() * 200, 0.05, 'triangle', 0.02, 200);
+    return e;
   }
 
   /* ---------- combat helpers ---------- */
@@ -969,13 +977,22 @@
     updatePlayer(dt);
 
     if (state === 'wave') {
-      if (spawnQueue.length) {
-        spawnTimer -= dt;
-        if (spawnTimer <= 0) {
-          spawn(spawnQueue.shift());
-          spawnTimer = waveInfo.interval * rand(0.6, 1.4);
+      if (countdown > 0) {
+        const before = Math.ceil(countdown);
+        countdown -= dt;
+        if (countdown <= 0) {
+          countdown = 0;
+          firstHalf.forEach(sp => { const e = spawn({ ...sp, quiet: true }); if (e) e.group = 1; });
+          firstHalf = [];
+          SND.wave();
           updateBadge();
-        }
+        } else if (Math.ceil(countdown) !== before) sfx(660, 0.08, 'square', 0.04);
+      } else if (spawnQueue.length && enemies.filter(e => e.group === 1 && !e.dead && e.kind !== 'necessary').length <= 1) {
+        spawnQueue.forEach(sp => spawn({ ...sp, quiet: true }));
+        spawnQueue = [];
+        SND.wave();
+        floaters.push({ x: W / 2, y: H * 0.35, text: 'SECOND WAVE', color: '#b71c1c', life: 1.6, max: 1.6, big: true });
+        updateBadge();
       }
       updateNav(dt);
       updateEnemies(dt);
@@ -984,7 +1001,7 @@
     updateBullets(dt);
     updatePowerups(dt);
 
-    if (state === 'wave' && !spawnQueue.length && !enemies.some(e => e.kind !== 'necessary')) {
+    if (state === 'wave' && countdown <= 0 && !spawnQueue.length && !enemies.some(e => e.kind !== 'necessary')) {
       waveCleared();
     }
   }
@@ -1537,9 +1554,8 @@
       ctx.arc(e.x, e.y, e.r * (0.3 + k * 0.9), 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
-      ctx.globalAlpha = k * 0.6;
-      ctx.drawImage(spr.img, Math.round(e.x - size / 2), Math.round(e.y - size / 2), size, size);
-      ctx.globalAlpha = 1;
+      const g = Math.round(size * (1 - Math.pow(1 - k, 3)));
+      if (g > 0) ctx.drawImage(spr.img, Math.round(e.x - g / 2), Math.round(e.y - g / 2), g, g);
       return;
     }
 
@@ -1844,6 +1860,15 @@
       const a = 0.6 + Math.sin(idleHintT * 3) * 0.4;
       ctx.globalAlpha = a;
       text(`Click the cookie extension (top right) or press ENTER to start wave ${wave}`, W / 2, H - 92, 9, '#1851ce');
+      ctx.globalAlpha = 1;
+    }
+    if (state === 'wave' && countdown > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${0.55 * Math.min(1, countdown / 0.3)})`;
+      ctx.fillRect(0, 0, W, H);
+      const n = Math.ceil(countdown);
+      const f = countdown - Math.floor(countdown) || 1;
+      ctx.globalAlpha = Math.min(1, f * 2);
+      text(String(n), W / 2, H / 2, Math.round(40 + (1 - f) * 24), '#fff');
       ctx.globalAlpha = 1;
     }
     if (state === 'wave' && paused) {
