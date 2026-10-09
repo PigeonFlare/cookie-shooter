@@ -333,7 +333,7 @@
       spd: Math.min(2.2, 1 + 0.06 * (w - 1)),
       dmg: 1 + 0.12 * (w - 1),
       hp: 1 + 0.13 * (w - 1),
-      shooterFrac: Math.min(0.5, 0.18 + 0.03 * w),
+      shooterFrac: Math.min(0.75, 0.55 + 0.02 * w),
       necessary: Math.min(8, 2 + Math.floor(w / 2)),
       boss: w % 5 === 0,
       interval: Math.max(0.22, 1.1 - 0.05 * w),
@@ -853,9 +853,9 @@
     } else if (kind === 'chaser') {
       Object.assign(e, { r: 13, scale: 2, hp: 18 * wp.hp, speed: BASE.speed * rand(1.04, 1.16) * Math.min(1.3, 1 + 0.02 * (wave - 1)), dmg: 20 * wp.dmg, touch: 20 * wp.dmg });
     } else if (kind === 'shooter') {
-      Object.assign(e, { r: 18, scale: 3, hp: 28 * wp.hp, speed: 70 * wp.spd * rand(0.8, 1.2), dmg: 11 * wp.dmg, touch: 18 * wp.dmg, keep: rand(200, 300),
-        pattern: pick(PATTERNS.filter(pt => pt.from <= wave)).id, move: pick(['kite', 'orbit', 'hop', 'drift']),
-        orbitA: rand(0, 6.3), orbitDir: Math.random() < 0.5 ? 1 : -1, hopT: 0, hopX: x, hopY: y, homeX: x, homeY: y, bulletSpeed: 150 * Math.min(1.5, wp.spd), shots: 0, shotT: 0, spinA: rand(0, 6.3) });
+      Object.assign(e, { r: 18, scale: 3, hp: 28 * wp.hp, speed: 110 * wp.spd * rand(0.85, 1.15), dmg: 11 * wp.dmg, touch: 18 * wp.dmg, keep: rand(190, 260),
+        pattern: pick(PATTERNS.filter(pt => pt.from <= wave)).id,
+        orbitA: rand(0, 6.3), orbitDir: Math.random() < 0.5 ? 1 : -1, bulletSpeed: 330 * Math.min(1.25, wp.spd), shots: 0, shotT: 0, spinA: rand(0, 6.3) });
     } else {
       Object.assign(e, { r: 46, scale: 7, hp: 420 * wp.hp, speed: 45 * wp.spd, dmg: 13 * wp.dmg, touch: 35 * wp.dmg, bulletSpeed: 150, shots: 0, shotT: 0, spinA: 0,
         phase: 'orbit', phaseT: 3, orbitA: 0, orbitDir: 1, windup: 0, chargesLeft: 0, fadeT: 0, trailT: 0, variant: pick(BOSS_VARIANTS), fireCd: 1.2 });
@@ -1227,16 +1227,16 @@
     switch (e.pattern) {
       case 'burst3':
         e.shots = 3; e.shotT = 0;
-        e.fireCd = rand(1.5, 2.1) / fr;
+        e.fireCd = rand(0.85, 1.25) / fr;
         return;
       case 'heavy':
-        enemyShoot(e, aim, e.bulletSpeed * rand(1.05, 1.2), e.dmg * 1.8, col, { lead: true, r: 8 });
-        e.fireCd = rand(2, 2.6) / fr;
+        enemyShoot(e, aim, e.bulletSpeed * rand(0.95, 1.05), e.dmg * 1.8, col, { lead: true, r: 8 });
+        e.fireCd = rand(1.1, 1.5) / fr;
         sfx(320, 0.12, 'square', 0.04, -180);
         return;
       case 'laser':
         fireLaser(e, aim, e.dmg * 2.2, col, 14);
-        e.fireCd = rand(3.4, 4.2) / fr;
+        e.fireCd = rand(2.6, 3.1) / fr;
         return;
     }
   }
@@ -1250,7 +1250,7 @@
       enemyShoot(e, e.burstA, e.burstSpeed, e.dmg, BOSS_COLORS[e.variant]);
       e.shotT = 0.08;
     } else {
-      enemyShoot(e, Math.atan2(player.y - e.y, player.x - e.x), e.bulletSpeed * rand(1.35, 1.5), e.dmg, PATTERN_COLORS[e.pattern], { lead: true });
+      enemyShoot(e, Math.atan2(player.y - e.y, player.x - e.x), e.bulletSpeed * rand(1.15, 1.25), e.dmg, PATTERN_COLORS[e.pattern], { lead: true });
       e.shotT = 0.11;
     }
     SND.enemyShot();
@@ -1314,34 +1314,21 @@
         steer = 2.2;
       } else if (e.kind === 'shooter') {
         const aim = Math.atan2(dy, dx);
-        if (e.move === 'kite') {
-          const side = Math.sin(e.wanderA) > 0 ? 1 : -1;
-          if (d > e.keep + 40) { tvx = nx * e.speed; tvy = ny * e.speed; }
-          else if (d < e.keep - 40) { tvx = -nx * e.speed; tvy = -ny * e.speed; }
-          else { tvx = -ny * side * e.speed * 0.7; tvy = nx * side * e.speed * 0.7; }
-        } else if (e.move === 'orbit') {
-          e.orbitA += dt * e.orbitDir * e.speed / Math.max(120, e.keep);
-          const ox = p.x - Math.cos(e.orbitA) * e.keep - e.x, oy = p.y - Math.sin(e.orbitA) * e.keep - e.y, od = hyp(ox, oy) || 1;
-          const sp = Math.min(e.speed * 1.6, od * 2.5);
-          tvx = ox / od * sp; tvy = oy / od * sp;
-        } else if (e.move === 'hop') {
-          e.hopT -= dt;
-          if (e.hopT <= 0) {
-            e.hopT = rand(1.2, 2.2);
-            const ha = rand(0, Math.PI * 2), hr = rand(160, 320);
-            e.hopX = clamp(p.x + Math.cos(ha) * hr, 40, W - 40);
-            e.hopY = clamp(p.y + Math.sin(ha) * hr, 50, H - 40);
-          }
-          const ox = e.hopX - e.x, oy = e.hopY - e.y, od = hyp(ox, oy);
-          if (od > 8) { const sp = Math.min(e.speed * 3.2, od * 5); tvx = ox / od * sp; tvy = oy / od * sp; steer = 5; }
-        } else {
-          e.homeX += (p.x - e.homeX) * dt * 0.15;
-          e.homeY += (p.y - e.keep * 0.8 - e.homeY) * dt * 0.15;
-          const fx = e.homeX + Math.sin(e.t * 0.9) * 180, fy = clamp(e.homeY, 60, H - 60) + Math.sin(e.t * 1.8) * 70;
-          const ox = fx - e.x, oy = fy - e.y, od = hyp(ox, oy) || 1;
-          const sp = Math.min(e.speed * 1.8, od * 2);
-          tvx = ox / od * sp; tvy = oy / od * sp;
+        const qx = p.x < W / 2 ? 0 : W / 2, qy = p.y < H / 2 ? 0 : H / 2;
+        const qw = W / 2, qh = H / 2, pad = e.r + 10;
+        e.orbitA += dt * e.orbitDir * 0.5;
+        if (Math.random() < dt * 0.3) e.orbitDir = -e.orbitDir;
+        let gx = clamp(p.x + Math.cos(e.orbitA) * e.keep, qx + pad, qx + qw - pad);
+        let gy = clamp(p.y + Math.sin(e.orbitA) * e.keep, qy + pad, qy + qh - pad);
+        if (hyp(gx - p.x, gy - p.y) < e.keep * 0.7) {
+          gx = p.x - qx < qw / 2 ? qx + qw - pad : qx + pad;
+          gy = p.y - qy < qh / 2 ? qy + qh - pad : qy + pad;
         }
+        const ox = gx - e.x, oy = gy - e.y, od = hyp(ox, oy) || 1;
+        const sp = Math.min(e.speed * 1.8, od * 3);
+        tvx = ox / od * sp; tvy = oy / od * sp;
+        if (d < e.keep * 0.6) { tvx -= nx * e.speed; tvy -= ny * e.speed; }
+        steer = 3;
         if (lasers.some(lz => lz.owner === e)) { tvx *= 0.15; tvy *= 0.15; }
         shooterStream(e, dt);
         e.fireCd -= dt;
