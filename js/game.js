@@ -891,12 +891,12 @@
     const p = PALETTES[e.kind];
     const big = e.kind === 'boss';
     rings.push({ x: e.x, y: e.y, r: e.r * 0.5, rmax: e.r * (big ? 8 : 3.4), color: RING_COLORS[e.kind], life: big ? 0.8 : 0.42, max: big ? 0.8 : 0.42, w: big ? 14 : 6 });
-    flashes.push({ x: e.x, y: e.y, color: '#fff2c0', r: e.r * (big ? 5 : 2.6), life: big ? 0.4 : 0.2, max: big ? 0.4 : 0.2 });
-    sparks(e.x, e.y, '#ffd27a', big ? 60 : 12 + e.scale * 2, undefined, 0, big ? 600 : 380);
+    flashes.push({ x: e.x, y: e.y, color: '#ffab00', r: e.r * (big ? 5 : 2.6), life: big ? 0.4 : 0.2, max: big ? 0.4 : 0.2 });
+    sparks(e.x, e.y, '#ff9100', big ? 60 : 12 + e.scale * 2, undefined, 0, big ? 600 : 380);
     if (big) {
       hitStop = 0.2;
       whiteFlash = 0.8;
-      rings.push({ x: e.x, y: e.y, r: 10, rmax: Math.max(W, H), color: '#ffffff', life: 0.7, max: 0.7, w: 6 });
+      rings.push({ x: e.x, y: e.y, r: 10, rmax: Math.max(W, H), color: '#d500f9', life: 0.7, max: 0.7, w: 8 });
     }
     burst(e.x, e.y, p.body, 14 + e.scale * 2);
     burst(e.x, e.y, p.chip, 6 + e.scale);
@@ -1168,8 +1168,8 @@
     e.hitFlash = 0.08;
     e.vx += kx; e.vy += ky;
     burst(e.x, e.y, PALETTES[e.kind].edge, 3, 80);
-    sparks(e.x - kx * 0.25, e.y - ky * 0.25, '#ffe9a8', 6, Math.atan2(-ky, -kx), 1.1);
-    flashes.push({ x: e.x, y: e.y, color: '#fff3d0', r: e.r * 1.6, life: 0.06, max: 0.06 });
+    sparks(e.x - kx * 0.25, e.y - ky * 0.25, '#ffab00', 6, Math.atan2(-ky, -kx), 1.1);
+    flashes.push({ x: e.x, y: e.y, color: '#ffd740', r: e.r * 1.6, life: 0.06, max: 0.06 });
     if (e.kind === 'necessary') {
       floaters.push({ x: e.x, y: e.y - 26, text: 'FRIENDLY FIRE!', color: '#2e7d32', life: 0.9, max: 0.9 });
       SND.friendly();
@@ -1668,6 +1668,11 @@
         ctx.lineWidth = 1 + k * (lz.width - 6);
         ctx.setLineDash([10, 8]);
         ctx.lineDashOffset = -fxT * 90;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(30,0,40,.35)';
+        ctx.lineWidth += 3;
+        ctx.beginPath(); ctx.moveTo(lz.x, lz.y); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.restore();
         ctx.beginPath(); ctx.moveTo(lz.x, lz.y); ctx.lineTo(ex, ey); ctx.stroke();
         ctx.setLineDash([]);
         if (lz.warn < 0.6) {
@@ -1690,6 +1695,10 @@
       } else {
         const f = lz.active / LASER_ON;
         const w = lz.width * (0.7 + 0.5 * f) + rand(-2, 2);
+        ctx.globalAlpha = 0.5 * f + 0.15;
+        ctx.strokeStyle = 'rgba(30,0,40,.6)';
+        ctx.lineWidth = w * 1.3 + 5;
+        ctx.beginPath(); ctx.moveTo(lz.x, lz.y); ctx.lineTo(ex, ey); ctx.stroke();
         ctx.globalAlpha = 0.3 * f + 0.08;
         ctx.strokeStyle = lz.color;
         ctx.lineWidth = w * 2.6;
@@ -1823,85 +1832,21 @@
     ctx.drawImage(glowSprite(color), x - r, y - r, r * 2, r * 2);
   }
 
-  const lightCv = document.createElement('canvas');
-  const lctx = lightCv.getContext('2d');
-  const LIGHT_SCALE = 0.5;
-  const SOFT = (() => {
-    const cv = document.createElement('canvas');
-    cv.width = cv.height = 128;
-    const g = cv.getContext('2d');
-    const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-    grad.addColorStop(0, 'rgba(255,255,255,1)');
-    grad.addColorStop(0.4, 'rgba(255,255,255,0.6)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = grad;
-    g.fillRect(0, 0, 128, 128);
-    return cv;
-  })();
-  let vignette = null, vignetteKey = '';
-
   function drawLighting() {
-    const amb = state === 'wave' ? 0.64 : 0.22;
-    const lw = Math.ceil(W * LIGHT_SCALE), lh = Math.ceil(H * LIGHT_SCALE);
-    if (lightCv.width !== lw || lightCv.height !== lh) { lightCv.width = lw; lightCv.height = lh; }
-    lctx.setTransform(1, 0, 0, 1, 0, 0);
-    lctx.globalCompositeOperation = 'source-over';
-    lctx.globalAlpha = 1;
-    lctx.clearRect(0, 0, lw, lh);
-    lctx.fillStyle = `rgba(6,8,24,${amb})`;
-    lctx.fillRect(0, 0, lw, lh);
-    lctx.globalCompositeOperation = 'destination-out';
-    lctx.setTransform(LIGHT_SCALE, 0, 0, LIGHT_SCALE, 0, 0);
-    const light = (x, y, r, a) => { lctx.globalAlpha = Math.min(1, a); lctx.drawImage(SOFT, x - r, y - r, r * 2, r * 2); };
-    if (state !== 'dead') light(player.x, player.y, 150, 0.95);
-    for (const e of enemies) light(e.x, e.y, e.kind === 'boss' ? 170 : e.r * 2.6, e.kind === 'boss' ? 0.6 : 0.3);
-    for (const b of bullets) light(b.x, b.y, b.from === 'player' ? 46 : 22 + b.r * 4, 0.5);
-    for (const pu of powerups) light(pu.x, pu.y, 70, 0.6);
-    for (const f of flashes) light(f.x, f.y, f.r * 3, f.life / f.max);
-    for (const r of rings) light(r.x, r.y, r.r + r.rmax * 0.3, (r.life / r.max) * 0.6);
-    for (const lz of lasers) {
-      const L = rayLength(lz.x, lz.y, lz.a);
-      const on = lz.warn <= 0;
-      const k = on ? lz.active / LASER_ON : (1 - lz.warn / LASER_WARN) * 0.35;
-      const rad = on ? 70 : 30;
-      for (let d = 0; d <= L; d += rad * 0.6) light(lz.x + Math.cos(lz.a) * d, lz.y + Math.sin(lz.a) * d, rad, k);
-    }
-    ctx.drawImage(lightCv, 0, 0, W, H);
-
+    ctx.fillStyle = state === 'wave' ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.12)';
+    ctx.fillRect(0, 0, W, H);
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
     for (const lz of lasers) {
       if (lz.warn > 0) continue;
       const L = rayLength(lz.x, lz.y, lz.a);
-      ctx.globalAlpha = 0.18 * (lz.active / LASER_ON) + 0.04;
-      for (let d = 0; d <= L; d += 50) drawGlow(lz.x + Math.cos(lz.a) * d, lz.y + Math.sin(lz.a) * d, 90, lz.color);
-    }
-    for (const b of bullets) {
-      if (b.from === 'player') continue;
-      ctx.globalAlpha = 0.12;
-      drawGlow(b.x, b.y, 40 + b.r * 4, b.color);
+      ctx.globalAlpha = 0.16 * (lz.active / LASER_ON) + 0.05;
+      for (let d = 0; d <= L; d += 50) drawGlow(lz.x + Math.cos(lz.a) * d, lz.y + Math.sin(lz.a) * d, 70, lz.color);
     }
     for (const f of flashes) {
-      ctx.globalAlpha = 0.3 * f.life / f.max;
-      drawGlow(f.x, f.y, f.r * 3, f.color);
+      ctx.globalAlpha = 0.35 * f.life / f.max;
+      drawGlow(f.x, f.y, f.r * 2.4, f.color);
     }
     ctx.restore();
-
-    if (state === 'wave') {
-      const key = W + 'x' + H;
-      if (vignetteKey !== key) {
-        vignetteKey = key;
-        vignette = document.createElement('canvas');
-        vignette.width = Math.ceil(W / 4); vignette.height = Math.ceil(H / 4);
-        const g = vignette.getContext('2d');
-        const grad = g.createRadialGradient(vignette.width / 2, vignette.height / 2, Math.min(vignette.width, vignette.height) * 0.35, vignette.width / 2, vignette.height / 2, Math.hypot(vignette.width, vignette.height) / 2);
-        grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(0,0,10,0.45)');
-        g.fillStyle = grad;
-        g.fillRect(0, 0, vignette.width, vignette.height);
-      }
-      ctx.drawImage(vignette, 0, 0, W, H);
-    }
   }
 
   function drawBullets() {
@@ -1931,6 +1876,10 @@
         ctx.lineTo(b.x, b.y);
         ctx.stroke();
         ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(30,0,40,.55)';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r + 2.5, 0, Math.PI * 2);
+        ctx.fill();
         ctx.fillStyle = b.color;
         ctx.beginPath();
         ctx.arc(b.x, b.y, b.r + 1, 0, Math.PI * 2);
@@ -1963,7 +1912,7 @@
         drawGlow(e.x, e.y, e.r * 3, BOSS_COLORS[e.variant] || '#aa00ff');
       } else if (e.hitFlash > 0) {
         ctx.globalAlpha = 0.6;
-        drawGlow(e.x, e.y, e.r * 2, '#fff3d0');
+        drawGlow(e.x, e.y, e.r * 2, '#ffd740');
       }
     }
     for (const b of bullets) {
@@ -1993,7 +1942,7 @@
     for (const f of flashes) {
       ctx.globalAlpha = f.life / f.max;
       drawGlow(f.x, f.y, f.r, f.color);
-      drawGlow(f.x, f.y, f.r * 0.4, '#ffffff');
+      drawGlow(f.x, f.y, f.r * 0.4, '#fff176');
     }
     if (state !== 'dead' && player) {
       ctx.globalAlpha = player.dashT > 0 ? 0.7 : 0.3;
@@ -2053,7 +2002,7 @@
       ctx.fillRect(0, 0, W, H);
     }
     if (whiteFlash > 0) {
-      ctx.fillStyle = `rgba(255,255,255,${whiteFlash * 0.55})`;
+      ctx.fillStyle = `rgba(255,236,179,${whiteFlash * 0.45})`;
       ctx.fillRect(0, 0, W, H);
     }
 
