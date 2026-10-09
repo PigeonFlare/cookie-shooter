@@ -1,0 +1,90 @@
+window.COOKIE_DB = window.COOKIE_DB || {
+  necessary: [
+    { n: 'ACCOUNT_CHOOSER', d: 'accounts.google.com' },
+    { n: 'SID', d: 'google.com' },
+    { n: 'HSID', d: 'google.com' },
+    { n: 'SSID', d: 'google.com' },
+    { n: '__Secure-1PSID', d: 'google.com' },
+    { n: 'LSID', d: 'accounts.google.com' },
+    { n: '__Host-GAPS', d: 'accounts.google.com' },
+    { n: 'SMSV', d: 'accounts.google.com' },
+    { n: 'SOCS', d: 'google.com' },
+    { n: 'AEC', d: 'google.com' }
+  ],
+  chaser: [
+    { n: '__utma', d: 'google-analytics.com' },
+    { n: '__utmz', d: 'google-analytics.com' },
+    { n: '_ga', d: 'google-analytics.com' },
+    { n: '_gid', d: 'google-analytics.com' },
+    { n: '_gat_UA-1824706-1', d: 'google-analytics.com' },
+    { n: '_gcl_au', d: 'googleadservices.com' },
+    { n: '_dc_gtm', d: 'googletagmanager.com' },
+    { n: 'OTZ', d: 'google.com' },
+    { n: '1P_JAR', d: 'google.com' },
+    { n: 'NID', d: 'google.com' },
+    { n: '_hjSessionUser', d: 'hotjar.com' },
+    { n: '_hjAbsoluteSessionInProgress', d: 'hotjar.com' },
+    { n: '_clck', d: 'clarity.ms' },
+    { n: '_clsk', d: 'clarity.ms' },
+    { n: '_fbp', d: 'facebook.com' },
+    { n: 'ajs_anonymous_id', d: 'segment.com' },
+    { n: 'ajs_user_id', d: 'segment.com' },
+    { n: 'mp_mixpanel', d: 'mixpanel.com' },
+    { n: 'amplitude_id', d: 'amplitude.com' },
+    { n: '_pk_id', d: 'matomo.cloud' },
+    { n: 'optimizelyEndUserId', d: 'optimizely.com' },
+    { n: '_vwo_uuid', d: 'visualwebsiteoptimizer.com' },
+    { n: '__hstc', d: 'hubspot.com' },
+    { n: 'hubspotutk', d: 'hubspot.com' },
+    { n: 'intercom-id', d: 'intercom.io' },
+    { n: '__kla_id', d: 'klaviyo.com' }
+  ],
+  shooter: [
+    { n: 'IDE', d: 'doubleclick.net' },
+    { n: 'DSID', d: 'doubleclick.net' },
+    { n: 'test_cookie', d: 'doubleclick.net' },
+    { n: '__gads', d: 'googlesyndication.com' },
+    { n: '__gpi', d: 'googlesyndication.com' },
+    { n: 'fr', d: 'facebook.com' },
+    { n: 'MUID', d: 'bing.com' },
+    { n: 'uuid2', d: 'adnxs.com' },
+    { n: 'anj', d: 'adnxs.com' },
+    { n: 'uid', d: 'criteo.com' },
+    { n: 'cto_bundle', d: 'criteo.com' },
+    { n: 't_gid', d: 'taboola.com' },
+    { n: 'obuid', d: 'outbrain.com' },
+    { n: 'UID', d: 'scorecardresearch.com' },
+    { n: 'mc', d: 'quantserve.com' },
+    { n: 'khaos', d: 'rubiconproject.com' },
+    { n: 'KADUSERCOOKIE', d: 'pubmatic.com' },
+    { n: 'TDID', d: 'adsrvr.org' },
+    { n: 'ad-id', d: 'amazon-adsystem.com' },
+    { n: 'demdex', d: 'demdex.net' },
+    { n: 'dpm', d: 'demdex.net' },
+    { n: 'bcookie', d: 'linkedin.com' },
+    { n: 'li_sugr', d: 'linkedin.com' },
+    { n: 'personalization_id', d: 'twitter.com' },
+    { n: '_ttp', d: 'tiktok.com' },
+    { n: 'VISITOR_INFO1_LIVE', d: 'youtube.com' },
+    { n: 'everest_g_v2', d: 'everesttech.net' },
+    { n: 'A3', d: 'yahoo.com' },
+    { n: 'IDSYNC', d: 'yahoo.com' },
+    { n: 'tuuid', d: 'bidswitch.net' },
+    { n: 'i', d: 'openx.net' }
+  ],
+  boss: [
+    { n: 'evercookie', d: 'samy.pl' },
+    { n: 'zombie cookie', d: 'kissmetrics.com' },
+    { n: 'UIDH supercookie', d: 'verizon.net' },
+    { n: 'Flash LSO', d: 'macromedia.com' }
+  ]
+};
+
+(() => {
+  const host = location.hostname.replace(/^www\./, '');
+  if (!host || /(^|\.)google\./.test(host)) return;
+  window.COOKIE_DB.necessary = [
+    'session', 'sessionid', '__Host-session', 'csrftoken', 'XSRF-TOKEN', '__Secure-next-auth.session-token',
+    'remember_token', 'auth_token', 'cookie_consent', 'cart_id'
+  ].map(n => ({ n, d: host }));
+})();

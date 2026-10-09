@@ -36,6 +36,18 @@ The Google logo letters, search box, buttons and links in the middle of the page
 
 Click the cookie icon next to the address bar to open Cookie Crusher. From there you can start the next wave, save your progress (kept in your browser's local storage, so it survives a reload), load your save, or "clear browsing data" to start over.
 
+## Chrome extension
+
+The `extension` folder plays the same game on top of whatever page you're on. Buttons, inputs, images and boxed-in sections of the page (cards, panels, anything with a background or border) become breakable walls, and if a page has none you get an open arena. The cookies keep their real names, and the necessary ones are named after the site you're on.
+
+To install it:
+
+1. Download this repo (Code > Download ZIP) and unzip it.
+2. Open `chrome://extensions` and turn on **Developer mode**.
+3. Click **Load unpacked** and pick the `extension` folder.
+
+Then open any page, click the cookie icon in the toolbar and press **Start attack**. Open the popup again at any time and press **End attack** to put the page back exactly how it was. Chrome doesn't let extensions run on its own pages (`chrome://`, the Web Store), so those can't be attacked.
+
 ## Running locally
 
 It's a static site with no build step. Open `index.html`, or serve the folder:
