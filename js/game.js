@@ -34,6 +34,7 @@
     if (player) {
       player.x = clamp(player.x, 12, W - 12);
       player.y = clamp(player.y, 12, H - 12);
+      measureObstacles();
     }
   }
 
@@ -251,6 +252,13 @@
     for (const k in weaponBtns) {
       const f = clamp(cds[k] / CD_MAX[k], 0, 1);
       weaponBtns[k].querySelector('.cd').style.height = (f * 100).toFixed(1) + '%';
+    }
+    const wb = $('weapons');
+    if (player && wb) {
+      const vr = viewport.getBoundingClientRect(), r = wb.getBoundingClientRect();
+      const x0 = r.left - vr.left - 10, x1 = r.right - vr.left + 10, y0 = r.top - vr.top - 10, y1 = r.bottom - vr.top + 10;
+      const near = (x, y, rr) => x + rr > x0 && x - rr < x1 && y + rr > y0 && y - rr < y1;
+      wb.classList.toggle('faded', near(player.x, player.y, player.r) || enemies.some(e => near(e.x, e.y, e.r)));
     }
     const hidden = popup.classList.contains('hidden');
     const show = hidden && (state === 'idle' || state === 'wave');
@@ -484,11 +492,235 @@
     badge.classList.toggle('zero', n === 0);
   }
 
+  /* ---------- page obstacles ---------- */
+
+  const OBST_HP = 5;
+  const CELL = 20;
+  let obstacles = [];
+  const nav = { cols: 0, rows: 0, blocked: null, dist: null, t: 0 };
+
+  function obstacleEls() {
+    return [...document.querySelectorAll('.glogo span, #gq, .gside, .gbtns button, .gpromo')];
+  }
+
+  function obstacleColor(el) {
+    if (el.parentElement && el.parentElement.classList.contains('glogo')) return getComputedStyle(el).color;
+    if (el.tagName === 'INPUT') return '#7e9db9';
+    if (el.tagName === 'BUTTON') return '#b5b5b5';
+    return '#3355cc';
+  }
+
+  function measureObstacles() {
+    const vr = viewport.getBoundingClientRect();
+    const prev = new Map(obstacles.map(o => [o.el, o]));
+    obstacles = [];
+    if ($('googlePage').classList.contains('hidden')) { buildNav(); return; }
+    for (const el of obstacleEls()) {
+      if (el.dataset.broken === '1') continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      const old = prev.get(el);
+      obstacles.push({
+        el, x: r.left - vr.left, y: r.top - vr.top, w: r.width, h: r.height,
+        hp: old ? old.hp : OBST_HP, cracks: old ? old.cracks : [], hitCd: 0, color: obstacleColor(el)
+      });
+    }
+    buildNav();
+  }
+
+  function restoreObstacles() {
+    for (const el of obstacleEls()) {
+      el.dataset.broken = '';
+      el.style.visibility = '';
+      el.style.opacity = '';
+    }
+    obstacles = [];
+    measureObstacles();
+  }
+
+  function hitObstacle(o, x, y) {
+    if (o.hp <= 0) return;
+    o.hp--;
+    const fx = clamp((x - o.x) / o.w, 0.05, 0.95), fy = clamp((y - o.y) / o.h, 0.05, 0.95);
+    const crack = [[fx, fy]];
+    let cx = fx, cy = fy;
+    for (let i = 0; i < 3; i++) {
+      cx = clamp(cx + rand(-0.25, 0.25), 0, 1);
+      cy = clamp(cy + rand(-0.35, 0.35), 0, 1);
+      crack.push([cx, cy]);
+    }
+    o.cracks.push(crack);
+    o.el.style.opacity = (0.45 + 0.55 * o.hp / OBST_HP).toFixed(2);
+    o.el.classList.remove('ghit');
+    void o.el.offsetWidth;
+    o.el.classList.add('ghit');
+    burst(x, y, o.color, 5, 90);
+    sfx(160 + o.hp * 40, 0.06, 'square', 0.03, -60);
+    if (o.hp <= 0) breakObstacle(o);
+  }
+
+  function breakObstacle(o) {
+    o.el.style.visibility = 'hidden';
+    o.el.dataset.broken = '1';
+    for (let i = 0; i < 28; i++) {
+      const x = o.x + rand(0, o.w), y = o.y + rand(0, o.h);
+      const a = rand(0, Math.PI * 2), sp = rand(40, 200);
+      particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 60, life: rand(0.5, 1), max: 1, color: i % 3 ? o.color : '#555', size: rand(3, 6) | 0 });
+    }
+    shake = Math.min(12, shake + 4);
+    sfx(90, 0.25, 'sawtooth', 0.06, -40);
+    score += 5;
+    obstacles = obstacles.filter(x => x !== o);
+    buildNav();
+  }
+
+  function circleRect(cx, cy, r, o) {
+    const nx = clamp(cx, o.x, o.x + o.w), ny = clamp(cy, o.y, o.y + o.h);
+    let dx = cx - nx, dy = cy - ny;
+    const d = hyp(dx, dy);
+    if (d >= r) return null;
+    if (d > 0) return { nx: dx / d, ny: dy / d, depth: r - d, px: nx, py: ny };
+    const l = cx - o.x, rr = o.x + o.w - cx, t = cy - o.y, b = o.y + o.h - cy;
+    const m = Math.min(l, rr, t, b);
+    if (m === l) return { nx: -1, ny: 0, depth: l + r, px: o.x, py: cy };
+    if (m === rr) return { nx: 1, ny: 0, depth: rr + r, px: o.x + o.w, py: cy };
+    if (m === t) return { nx: 0, ny: -1, depth: t + r, px: cx, py: o.y };
+    return { nx: 0, ny: 1, depth: b + r, px: cx, py: o.y + o.h };
+  }
+
+  function pushOut(ent, r) {
+    let touched = null;
+    for (const o of obstacles) {
+      const c = circleRect(ent.x, ent.y, r, o);
+      if (!c) continue;
+      ent.x += c.nx * c.depth;
+      ent.y += c.ny * c.depth;
+      const vn = ent.vx * c.nx + ent.vy * c.ny;
+      if (vn < 0) { ent.vx -= vn * c.nx; ent.vy -= vn * c.ny; }
+      touched = touched || { o, c, vn };
+    }
+    return touched;
+  }
+
+  function insideObstacle(x, y, pad) {
+    return obstacles.some(o => x > o.x - pad && x < o.x + o.w + pad && y > o.y - pad && y < o.y + o.h + pad);
+  }
+
+  function obstacleAt(x, y, pad) {
+    return obstacles.find(o => x > o.x - pad && x < o.x + o.w + pad && y > o.y - pad && y < o.y + o.h + pad);
+  }
+
+  function segRect(x1, y1, x2, y2, o, pad) {
+    const dx = x2 - x1, dy = y2 - y1;
+    let t0 = 0, t1 = 1;
+    const ps = [-dx, dx, -dy, dy];
+    const qs = [x1 - (o.x - pad), o.x + o.w + pad - x1, y1 - (o.y - pad), o.y + o.h + pad - y1];
+    for (let i = 0; i < 4; i++) {
+      if (ps[i] === 0) { if (qs[i] < 0) return null; continue; }
+      const t = qs[i] / ps[i];
+      if (ps[i] < 0) { if (t > t1) return null; if (t > t0) t0 = t; }
+      else { if (t < t0) return null; if (t < t1) t1 = t; }
+    }
+    return t0;
+  }
+
+  function segBlocked(x1, y1, x2, y2, pad) {
+    for (const o of obstacles) if (segRect(x1, y1, x2, y2, o, pad) !== null) return true;
+    return false;
+  }
+
+  function rayLength(x, y, a) {
+    const L = hyp(W, H) * 1.2;
+    let best = L;
+    const x2 = x + Math.cos(a) * L, y2 = y + Math.sin(a) * L;
+    for (const o of obstacles) {
+      const t = segRect(x, y, x2, y2, o, 0);
+      if (t !== null && t * L < best) best = t * L;
+    }
+    return best;
+  }
+
+  function buildNav() {
+    nav.cols = Math.max(1, Math.ceil(W / CELL));
+    nav.rows = Math.max(1, Math.ceil(H / CELL));
+    const n = nav.cols * nav.rows;
+    nav.blocked = new Uint8Array(n);
+    nav.dist = new Int32Array(n).fill(-1);
+    for (let r = 0; r < nav.rows; r++) {
+      for (let c = 0; c < nav.cols; c++) {
+        if (insideObstacle(c * CELL + CELL / 2, r * CELL + CELL / 2, 14)) nav.blocked[r * nav.cols + c] = 1;
+      }
+    }
+    nav.t = 0;
+  }
+
+  const NB = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+  function updateNav(dt) {
+    nav.t -= dt;
+    if (nav.t > 0 || !nav.blocked || !obstacles.length) return;
+    nav.t = 0.2;
+    const { cols, rows, blocked, dist } = nav;
+    dist.fill(-1);
+    const pc = clamp(Math.floor(player.x / CELL), 0, cols - 1), pr = clamp(Math.floor(player.y / CELL), 0, rows - 1);
+    const q = new Int32Array(cols * rows);
+    let head = 0, tail = 0;
+    q[tail++] = pr * cols + pc;
+    dist[pr * cols + pc] = 0;
+    while (head < tail) {
+      const cur = q[head++], c = cur % cols, r = (cur / cols) | 0;
+      for (const [dc, dr] of NB) {
+        const nc = c + dc, nr = r + dr;
+        if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+        const ni = nr * cols + nc;
+        if (blocked[ni] || dist[ni] >= 0) continue;
+        if (dc && dr && (blocked[r * cols + nc] || blocked[nr * cols + c])) continue;
+        dist[ni] = dist[cur] + 1;
+        q[tail++] = ni;
+      }
+    }
+  }
+
+  function flowDir(x, y) {
+    const { cols, rows, blocked, dist } = nav;
+    if (!dist) return null;
+    const c = clamp(Math.floor(x / CELL), 0, cols - 1), r = clamp(Math.floor(y / CELL), 0, rows - 1);
+    let best = -1, bd = dist[r * cols + c] >= 0 ? dist[r * cols + c] : 1e9;
+    for (const [dc, dr] of NB) {
+      const nc = c + dc, nr = r + dr;
+      if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+      const ni = nr * cols + nc;
+      if (blocked[ni] || dist[ni] < 0) continue;
+      if (dc && dr && (blocked[r * cols + nc] || blocked[nr * cols + c])) continue;
+      if (dist[ni] < bd) { bd = dist[ni]; best = ni; }
+    }
+    if (best < 0) return null;
+    const tx = (best % cols) * CELL + CELL / 2, ty = ((best / cols) | 0) * CELL + CELL / 2;
+    const dx = tx - x, dy = ty - y, d = hyp(dx, dy) || 1;
+    return { x: dx / d, y: dy / d };
+  }
+
+  function drawCracks() {
+    ctx.strokeStyle = 'rgba(40,40,40,.75)';
+    ctx.lineWidth = 2;
+    for (const o of obstacles) {
+      for (const cr of o.cracks) {
+        ctx.beginPath();
+        cr.forEach(([fx, fy], i) => {
+          const x = Math.round(o.x + fx * o.w), y = Math.round(o.y + fy * o.h);
+          if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+        });
+        ctx.stroke();
+      }
+    }
+  }
+
   /* ---------- game flow ---------- */
 
   function clearField() {
     enemies = []; bullets = []; powerups = []; particles = []; floaters = []; spawnQueue = [];
     slashes = []; ghosts = []; lasers = [];
+    restoreObstacles();
     for (const k in cds) cds[k] = 0;
   }
 
@@ -541,6 +773,7 @@
     state = 'wave';
     paused = false;
     player.inv = 1;
+    restoreObstacles();
     closePopup();
     tabIcon.classList.add('loading');
     SND.wave();
@@ -597,7 +830,7 @@
       x = rand(40, W - 40);
       y = rand(50, H - 40);
       tries++;
-    } while (atX === undefined && hyp(x - player.x, y - player.y) < 200 && tries < 30);
+    } while (atX === undefined && (hyp(x - player.x, y - player.y) < 200 || insideObstacle(x, y, 40)) && tries < 40);
     if (atX !== undefined) { x = atX; y = atY; }
 
     const wp = waveInfo;
@@ -685,6 +918,8 @@
   }
 
   function dropPowerup(x, y) {
+    const o = obstacleAt(x, y, 14);
+    if (o) y = o.y - 18 > 20 ? o.y - 18 : o.y + o.h + 18;
     powerups.push({ x: clamp(x, 20, W - 20), y: clamp(y, 20, H - 20), type: pick(['hp', 'spd', 'dmg']), life: 12, t: rand(0, 6) });
   }
 
@@ -732,7 +967,7 @@
           const dx = player.x - lz.x, dy = player.y - lz.y;
           const along = dx * Math.cos(lz.a) + dy * Math.sin(lz.a);
           const off = Math.abs(-dx * Math.sin(lz.a) + dy * Math.cos(lz.a));
-          if (along > 0 && off < lz.width / 2 + player.r && player.inv <= 0) {
+          if (along > 0 && along < rayLength(lz.x, lz.y, lz.a) && off < lz.width / 2 + player.r && player.inv <= 0) {
             lz.hit = true;
             hurtPlayer(lz.dmg, player.x - Math.sin(lz.a) * 10, player.y + Math.cos(lz.a) * 10);
           }
@@ -768,6 +1003,7 @@
           updateBadge();
         }
       }
+      updateNav(dt);
       updateEnemies(dt);
     }
 
@@ -830,6 +1066,13 @@
     }
     p.x = clamp(p.x + p.vx * dt, p.r, W - p.r);
     p.y = clamp(p.y + p.vy * dt, p.r, H - p.r);
+    for (const o of obstacles) o.hitCd = Math.max(0, o.hitCd - dt);
+    const bump = pushOut(p, p.r);
+    if (bump && bump.o.hitCd <= 0 && (p.dashT > 0 || bump.vn < -60)) {
+      bump.o.hitCd = 0.45;
+      hitObstacle(bump.o, bump.c.px, bump.c.py);
+      if (p.dashT > 0) { p.dashT = 0; shake = Math.min(10, shake + 3); }
+    }
     p.inv = Math.max(0, p.inv - dt);
 
     if (touch.active) {
@@ -874,6 +1117,14 @@
         da = Math.atan2(Math.sin(da), Math.cos(da));
         if (Math.abs(da) > BASE.swingArc && d > e.r) continue;
         damageEnemy(e, dmg * 2.2, dx / (d || 1) * 220, dy / (d || 1) * 220, 0.35);
+      }
+      for (const o of obstacles.slice()) {
+        const nx = clamp(p.x, o.x, o.x + o.w), ny = clamp(p.y, o.y, o.y + o.h);
+        const dx = nx - p.x, dy = ny - p.y, d = hyp(dx, dy);
+        if (d > reach) continue;
+        let da = Math.atan2(dy, dx) - a;
+        da = Math.atan2(Math.sin(da), Math.cos(da));
+        if (Math.abs(da) <= BASE.swingArc + 0.3 || d < p.r + 2) hitObstacle(o, nx, ny);
       }
       for (const b of bullets) {
         if (b.from !== 'enemy') continue;
@@ -1080,6 +1331,7 @@
       const dx = p.x - e.x, dy = p.y - e.y, d = hyp(dx, dy) || 1;
       const nx = dx / d, ny = dy / d;
       let tvx = 0, tvy = 0, steer = 2.5;
+      const flow = e.kind !== 'necessary' && obstacles.length && segBlocked(e.x, e.y, p.x, p.y, e.r * 0.7) ? flowDir(e.x, e.y) : null;
 
       if (e.kind === 'necessary') {
         e.wanderA += rand(-1.5, 1.5) * dt;
@@ -1199,6 +1451,10 @@
         }
       }
 
+      if (flow && !(e.kind === 'boss' && e.phase !== 'orbit')) {
+        const sp = e.kind === 'shooter' ? Math.max(e.speed * 1.3, 90) : e.kind === 'boss' ? e.speed * 3 : e.speed;
+        tvx = flow.x * sp; tvy = flow.y * sp; steer = Math.max(steer, 4);
+      }
       const k = Math.min(1, dt * steer);
       e.vx += (tvx - e.vx) * k;
       e.vy += (tvy - e.vy) * k;
@@ -1209,6 +1465,10 @@
       if (e.x > W - e.r) { e.x = W - e.r; e.vx = -Math.abs(e.vx); e.wanderA = Math.PI - e.wanderA; }
       if (e.y < e.r + 14) { e.y = e.r + 14; e.vy = Math.abs(e.vy); e.wanderA = -e.wanderA; }
       if (e.y > H - e.r) { e.y = H - e.r; e.vy = -Math.abs(e.vy); e.wanderA = -e.wanderA; }
+      if (obstacles.length && !e.ghost) {
+        const hit = pushOut(e, e.r * 0.8);
+        if (hit && e.kind === 'necessary') e.wanderA = Math.atan2(hit.c.ny, hit.c.nx) + rand(-1, 1);
+      }
 
       if (e.kind !== 'necessary' && !e.ghost && d < e.r + p.r && e.contactCd <= 0) {
         e.contactCd = 0.8;
@@ -1249,6 +1509,13 @@
       b.life -= dt;
       if (b.x < -10 || b.x > W + 10 || b.y < -10 || b.y > H + 10) b.life = 0;
       if (b.life <= 0) continue;
+      const wall = obstacles.length ? obstacleAt(b.x, b.y, b.r * 0.5) : null;
+      if (wall) {
+        b.life = 0;
+        if (b.from === 'player') hitObstacle(wall, b.x, b.y);
+        else burst(b.x, b.y, b.color, 2, 50);
+        continue;
+      }
 
       if (b.from === 'player') {
         for (const e of enemies) {
@@ -1445,8 +1712,8 @@
   }
 
   function drawLasers() {
-    const L = hyp(W, H) * 1.2;
     for (const lz of lasers) {
+      const L = rayLength(lz.x, lz.y, lz.a);
       const ex = lz.x + Math.cos(lz.a) * L, ey = lz.y + Math.sin(lz.a) * L;
       ctx.save();
       if (lz.warn > 0) {
@@ -1521,7 +1788,17 @@
     ctx.drawImage(img, Math.round(pu.x - w / 2), Math.round(y - h / 2), w, h);
   }
 
+  function hudBlocked() {
+    const x0 = 0, y0 = 20, x1 = 250, y1 = 90;
+    const near = (x, y, r) => x + r > x0 && x - r < x1 && y + r > y0 && y - r < y1;
+    if (player && near(player.x, player.y, player.r)) return true;
+    return enemies.some(e => near(e.x, e.y, e.r + 14));
+  }
+
+  let hudAlpha = 1;
   function drawHud() {
+    hudAlpha += ((hudBlocked() ? 0.25 : 1) - hudAlpha) * 0.2;
+    ctx.globalAlpha = hudAlpha;
     const pad = 10;
     const bw = 150;
     ctx.fillStyle = 'rgba(255,255,255,.85)';
@@ -1537,6 +1814,7 @@
     ctx.fillStyle = pct < 0.3 ? '#d8402a' : '#3fbf3f';
     for (let i = 0; i < segs * pct; i++) ctx.fillRect(pad + 3 + i * 6, pad + 45, 5, 8);
     text(`${Math.ceil(player.hp)}/${player.maxHp}`, pad + bw + 8, pad + 49, 8, '#333', 'left');
+    ctx.globalAlpha = 1;
   }
 
   function render() {
@@ -1550,6 +1828,8 @@
       ctx.fillStyle = 'rgba(255,255,255,.35)';
       ctx.fillRect(0, 0, W, H);
     }
+    drawHud();
+    drawCracks();
 
     for (const pu of powerups) drawPowerup(pu);
     for (const e of enemies) if (e.kind === 'necessary') drawEnemy(e);
@@ -1601,8 +1881,6 @@
       ctx.fillStyle = `rgba(220,30,30,${flashRed * 0.5})`;
       ctx.fillRect(0, 0, W, H);
     }
-
-    drawHud();
 
     if (state === 'idle' && popup.classList.contains('hidden') && floaters.every(f => !f.big)) {
       const a = 0.6 + Math.sin(idleHintT * 3) * 0.4;

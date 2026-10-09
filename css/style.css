@@ -205,6 +205,7 @@ html, body {
 
 #game {
   position: absolute;
+  z-index: 2;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -243,6 +244,13 @@ html, body {
   line-height: 1;
   text-shadow: 1px 1px 0 #bbb, 2px 2px 0 #aaa, 3px 3px 0 #999, 4px 5px 6px rgba(0, 0, 0, .35);
 }
+.glogo span { display: inline-block; }
+.ghit { animation: ghit .14s; }
+@keyframes ghit {
+  25% { transform: translate(-3px, 1px); }
+  50% { transform: translate(3px, -1px); }
+  75% { transform: translate(-1px, 2px); }
+}
 .glogo .b { color: #1851ce; }
 .glogo .r { color: #c61800; }
 .glogo .y { color: #efba00; }
@@ -280,7 +288,9 @@ html, body {
   display: flex;
   gap: 8px;
   z-index: 5;
+  transition: opacity .15s;
 }
+#weapons.faded { opacity: .3; }
 .wbtn {
   position: relative;
   width: 58px;
@@ -342,7 +352,7 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   pointer-events: none;
-  z-index: 4;
+  z-index: 1;
 }
 
 /* Extension popup */

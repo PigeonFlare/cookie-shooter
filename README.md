@@ -28,6 +28,10 @@ On a phone, touch and drag to fly. Swing and shoot auto-target the nearest track
 
 Waves grow in size, speed and damage. Deleted trackers sometimes drop a power-up: a heart for health, a lightning bolt for speed or a sword for damage. Each power-up of the same kind is worth a bit less than the last, so stacking one stat has diminishing returns.
 
+## The page fights back too
+
+The Google logo letters, search box, buttons and links in the middle of the page are solid. They block you, the cookies and every bullet and laser. Your shots, swings, dashes and bumps crack them, and each one shatters after five hits. Enemies path around whatever is still standing to reach you, and the page rebuilds itself at the start of every wave.
+
 ## The extension menu
 
 Click the cookie icon next to the address bar to open Cookie Crusher. From there you can start the next wave, save your progress (kept in your browser's local storage, so it survives a reload), load your save, or "clear browsing data" to start over.
