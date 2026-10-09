@@ -186,7 +186,12 @@ html, body {
 }
 #badge.zero { background: #4b8a2e; }
 #extBtn.pulse { animation: pulse 1s ease-in-out infinite; }
-@keyframes pulse { 50% { box-shadow: 0 0 0 3px rgba(255, 200, 0, .7); background: #fff6c2; } }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 190, 0, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(255, 190, 0, .85); background: #fff6c2; transform: scale(1.12); }
+}
+#extBtn.pulse-soft { animation: pulse-soft 2s ease-in-out infinite; }
+@keyframes pulse-soft { 50% { box-shadow: 0 0 0 2px rgba(255, 190, 0, .45); } }
 
 #viewport {
   position: relative;
@@ -265,6 +270,59 @@ html, body {
 .gpromo { margin-top: 28px; font-size: 13px; }
 .gfoot { text-align: center; padding: 0 0 28px; font-size: 13px; }
 .gcopy { margin-top: 10px; font-size: 11px; color: #666; }
+
+/* Attack buttons */
+#weapons {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 5;
+}
+.wbtn {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  padding: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
+  background: linear-gradient(#fdfdfd, #e6ecf5);
+  border: 1px solid #8a9bb7;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .2);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.wbtn canvas { image-rendering: pixelated; height: 24px; width: auto; }
+.wbtn .wname { font: 8px Silkscreen, Tahoma, sans-serif; color: #334; }
+.wbtn .key {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  font: bold 9px/1 Tahoma, Verdana, sans-serif;
+  color: #667;
+}
+.wbtn.active {
+  border-color: #e0a000;
+  background: linear-gradient(#fffbe6, #ffe9a8);
+  box-shadow: 0 0 0 2px rgba(255, 190, 0, .6), 0 2px 4px rgba(0, 0, 0, .2);
+}
+.wbtn .cd {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0;
+  background: rgba(40, 50, 80, .35);
+  pointer-events: none;
+}
 
 /* Status bubble */
 #status {
@@ -425,4 +483,6 @@ html, body {
   #toolbar .menu, #toolbar .nav[disabled] { display: none; }
   #popup { right: 6px; left: 6px; width: auto; top: 70px; max-height: calc(100% - 80px); overflow: auto; }
   .pop-arrow { right: 70px; }
+  #weapons { bottom: 30px; gap: 12px; }
+  .wbtn { width: 64px; height: 64px; }
 }
