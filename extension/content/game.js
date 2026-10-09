@@ -491,7 +491,7 @@
       if (r.bottom < 0 || r.right < 0 || r.top > vh || r.left > vw) continue;
       const visW = Math.min(r.right, vw) - Math.max(r.left, 0), visH = Math.min(r.bottom, vh) - Math.max(r.top, 0);
       if (visW * visH < r.width * r.height * 0.6) continue;
-      if (r.width * r.height > area * 0.22 || r.width > vw * 0.85 || r.height > vh * 0.6) continue;
+      if (r.width * r.height > area * 0.22 || r.width > vw / 3 || r.height > vh * 0.6) continue;
       const cs = getComputedStyle(el);
       if (cs.visibility !== 'visible' || parseFloat(cs.opacity) < 0.1 || cs.display === 'none') continue;
       if (cs.position === 'fixed' && r.width * r.height > area * 0.1) continue;
