@@ -307,7 +307,7 @@
   let paused = false;
   let enemies = [], bullets = [], powerups = [], particles = [], floaters = [];
   let spawnQueue = [], spawnTimer = 0, waveInfo = null, countdown = 0, firstHalf = [];
-  let shake = 0, flashRed = 0;
+  let shake = 0, flashRed = 0, flashes = [], rings = [], hitStop = 0, whiteFlash = 0, fxT = 0;
   let loadedThisWave = 0, domainsThisWave = new Set();
   let idleHintT = 0;
   let weapon = 'shoot';
@@ -719,7 +719,7 @@
   /* ---------- game flow ---------- */
 
   function clearField() {
-    enemies = []; bullets = []; powerups = []; particles = []; floaters = []; spawnQueue = []; firstHalf = []; countdown = 0;
+    enemies = []; bullets = []; powerups = []; particles = []; floaters = []; spawnQueue = []; firstHalf = []; countdown = 0; flashes = []; rings = []; hitStop = 0; whiteFlash = 0;
     slashes = []; ghosts = []; lasers = [];
     restoreObstacles();
     for (const k in cds) cds[k] = 0;
@@ -866,6 +866,7 @@
     loadedThisWave++;
     domainsThisWave.add(info.d);
     if (kind !== 'boss') setStatus(`Waiting for ${info.d}...`);
+    rings.push({ x, y, r: 2, rmax: e.r * 2.6, color: RING_COLORS[kind], life: 0.75, max: 0.75, w: 3 });
     if (!spec.quiet) sfx(300 + Math.random() * 200, 0.05, 'triangle', 0.02, 200);
     return e;
   }
@@ -878,8 +879,10 @@
     dmg = clamp(dmg, 12, 25);
     player.hp -= dmg;
     player.inv = ignoreInv ? Math.max(player.inv, 0.15) : 0.7;
-    shake = Math.min(12, shake + 4 + dmg * 0.3);
-    flashRed = 0.25;
+    shake = Math.min(14, shake + 5 + dmg * 0.3);
+    flashRed = 0.35;
+    rings.push({ x: player.x, y: player.y, r: 8, rmax: 70, color: '#ff1744', life: 0.3, max: 0.3, w: 4 });
+    sparks(player.x, player.y, '#ff8a80', 10);
     SND.hurt();
     if (srcX !== undefined) {
       const dx = player.x - srcX, dy = player.y - srcY, d = hyp(dx, dy) || 1;
@@ -902,8 +905,26 @@
     }
   }
 
+  const RING_COLORS = { necessary: '#69f0ae', chaser: '#ff5252', shooter: '#b388ff', boss: '#ea80fc' };
+
+  function sparks(x, y, color, n, dir, spread = 1.3, speed = 340) {
+    for (let i = 0; i < n; i++) {
+      const a = dir === undefined ? rand(0, Math.PI * 2) : dir + rand(-spread, spread), sp = rand(speed * 0.35, speed);
+      particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.15, 0.4), max: 0.4, color, size: 2, spark: true });
+    }
+  }
+
   function killEnemy(e) {
     const p = PALETTES[e.kind];
+    const big = e.kind === 'boss';
+    rings.push({ x: e.x, y: e.y, r: e.r * 0.5, rmax: e.r * (big ? 8 : 3.4), color: RING_COLORS[e.kind], life: big ? 0.8 : 0.42, max: big ? 0.8 : 0.42, w: big ? 14 : 6 });
+    flashes.push({ x: e.x, y: e.y, color: '#fff2c0', r: e.r * (big ? 5 : 2.6), life: big ? 0.4 : 0.2, max: big ? 0.4 : 0.2 });
+    sparks(e.x, e.y, '#ffd27a', big ? 60 : 12 + e.scale * 2, undefined, 0, big ? 600 : 380);
+    if (big) {
+      hitStop = 0.2;
+      whiteFlash = 0.8;
+      rings.push({ x: e.x, y: e.y, r: 10, rmax: Math.max(W, H), color: '#ffffff', life: 0.7, max: 0.7, w: 6 });
+    }
     burst(e.x, e.y, p.body, 14 + e.scale * 2);
     burst(e.x, e.y, p.chip, 6 + e.scale);
     e.dead = true;
@@ -919,7 +940,7 @@
     score += Math.round(pts * (1 + 0.1 * (wave - 1)));
     floaters.push({ x: e.x, y: e.y - 20, text: e.kind === 'boss' ? 'SUPERCOOKIE DELETED' : 'DELETED', color: '#444', life: 0.9, max: 0.9 });
     if (e.kind === 'boss') {
-      shake = 14;
+      shake = 22;
       for (let i = 0; i < 3; i++) dropPowerup(e.x + rand(-40, 40), e.y + rand(-30, 30));
     } else if (Math.random() < 0.1) {
       dropPowerup(e.x, e.y);
@@ -961,6 +982,7 @@
   /* ---------- update ---------- */
 
   function update(dt) {
+    if (hitStop > 0) { hitStop -= dt; dt *= 0.12; }
     for (const f of floaters) { f.life -= dt; f.y -= (f.big ? 8 : 26) * dt; }
     for (const sl of slashes) { sl.life -= dt; sl.x = player.x; sl.y = player.y; }
     for (const lz of lasers) {
@@ -969,9 +991,17 @@
       if (paused || (state !== 'wave' && state !== 'idle')) continue;
       if (lz.warn > 0) {
         lz.warn -= dt;
-        if (lz.warn <= 0) { sfx(110, 0.35, 'sawtooth', 0.06, 300); shake = Math.min(12, shake + 3); }
+        if (lz.warn <= 0) {
+          sfx(110, 0.35, 'sawtooth', 0.06, 300);
+          shake = Math.min(14, shake + 6);
+          whiteFlash = Math.max(whiteFlash, 0.1);
+          flashes.push({ x: lz.x, y: lz.y, color: lz.color, r: 70, life: 0.3, max: 0.3 });
+        }
       } else {
         lz.active -= dt;
+        shake = Math.max(shake, 4);
+        const L = rayLength(lz.x, lz.y, lz.a);
+        if (Math.random() < 0.8) sparks(lz.x + Math.cos(lz.a) * L, lz.y + Math.sin(lz.a) * L, Math.random() < 0.5 ? '#ffffff' : lz.color, 2, lz.a + Math.PI, 1.2, 300);
         if (!lz.hit && state === 'wave') {
           const dx = player.x - lz.x, dy = player.y - lz.y;
           const along = dx * Math.cos(lz.a) + dy * Math.sin(lz.a);
@@ -994,6 +1024,16 @@
       p.vx *= 0.92; p.vy = p.vy * 0.92 + 200 * dt;
     }
     particles = particles.filter(p => p.life > 0);
+    if (particles.length > 900) particles.splice(0, particles.length - 900);
+    for (const f of flashes) f.life -= dt;
+    flashes = flashes.filter(f => f.life > 0);
+    for (const r of rings) r.life -= dt;
+    rings = rings.filter(r => r.life > 0);
+    whiteFlash = Math.max(0, whiteFlash - dt * 2.5);
+    if (state === 'wave' && hyp(player.vx, player.vy) > 60 && Math.random() < 0.7) {
+      const ba = player.angle + Math.PI + rand(-0.4, 0.4);
+      particles.push({ x: player.x + Math.cos(player.angle + Math.PI) * 10, y: player.y + Math.sin(player.angle + Math.PI) * 10, vx: Math.cos(ba) * 90, vy: Math.sin(ba) * 90 - 20, life: rand(0.15, 0.35), max: 0.35, color: Math.random() < 0.5 ? '#ff9800' : '#ffd54f', size: 2, spark: true });
+    }
     shake = Math.max(0, shake - dt * 30);
     flashRed = Math.max(0, flashRed - dt);
 
@@ -1113,6 +1153,7 @@
         vx: Math.cos(a) * BASE.bulletSpeed, vy: Math.sin(a) * BASE.bulletSpeed,
         r: 6, dmg, from: 'player', life: 1.6
       });
+      flashes.push({ x: p.x + Math.cos(a) * 16, y: p.y + Math.sin(a) * 16, color: '#6fa0ff', r: 26, life: 0.07, max: 0.07 });
       SND.shoot();
     } else if (w === 'swing') {
       cds.swing = BASE.swingCd;
@@ -1154,6 +1195,8 @@
     e.hitFlash = 0.08;
     e.vx += kx; e.vy += ky;
     burst(e.x, e.y, PALETTES[e.kind].edge, 3, 80);
+    sparks(e.x - kx * 0.25, e.y - ky * 0.25, '#ffe9a8', 6, Math.atan2(-ky, -kx), 1.1);
+    flashes.push({ x: e.x, y: e.y, color: '#fff3d0', r: e.r * 1.6, life: 0.06, max: 0.06 });
     if (e.kind === 'necessary') {
       floaters.push({ x: e.x, y: e.y - 26, text: 'FRIENDLY FIRE!', color: '#2e7d32', life: 0.9, max: 0.9 });
       SND.friendly();
@@ -1287,6 +1330,7 @@
       vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
       r: 3, dmg, from: 'enemy', life: 7, t: 0, color: color || '#e0157a'
     }, extra || {}));
+    flashes.push({ x: e.x + Math.cos(angle) * e.r, y: e.y + Math.sin(angle) * e.r, color: color || '#e0157a', r: 22, life: 0.09, max: 0.09 });
   }
 
   function updateEnemies(dt) {
@@ -1439,6 +1483,7 @@
       const wall = obstacles.length ? obstacleAt(b.x, b.y, b.r * 0.5) : null;
       if (wall) {
         b.life = 0;
+        sparks(b.x, b.y, b.from === 'player' ? '#9cc2ff' : b.color, 5, Math.atan2(-b.vy, -b.vx), 1.2, 260);
         hitObstacle(wall);
         continue;
       }
@@ -1641,33 +1686,64 @@
       const L = rayLength(lz.x, lz.y, lz.a);
       const ex = lz.x + Math.cos(lz.a) * L, ey = lz.y + Math.sin(lz.a) * L;
       ctx.save();
+      ctx.lineCap = 'round';
       if (lz.warn > 0) {
         const k = 1 - lz.warn / LASER_WARN;
-        const blink = lz.warn < 0.5 ? (Math.floor(lz.warn * 16) % 2 ? 1 : 0.3) : 0.5 + Math.sin(k * 30) * 0.2;
+        const blink = lz.warn < 0.5 ? (Math.floor(lz.warn * 16) % 2 ? 1 : 0.35) : 0.55 + Math.sin(k * 30) * 0.2;
         ctx.globalAlpha = (0.25 + k * 0.6) * blink;
         ctx.strokeStyle = lz.color;
-        ctx.lineWidth = 1 + k * (lz.width - 4);
-        ctx.setLineDash([8, 6]);
-        ctx.lineDashOffset = -k * 60;
-        ctx.beginPath();
-        ctx.moveTo(lz.x, lz.y);
-        ctx.lineTo(ex, ey);
-        ctx.stroke();
+        ctx.lineWidth = 1 + k * (lz.width - 6);
+        ctx.setLineDash([10, 8]);
+        ctx.lineDashOffset = -fxT * 90;
+        ctx.beginPath(); ctx.moveTo(lz.x, lz.y); ctx.lineTo(ex, ey); ctx.stroke();
         ctx.setLineDash([]);
-        ctx.globalAlpha = 0.9 * blink;
+        if (lz.warn < 0.6) {
+          ctx.globalAlpha = 0.5 + 0.5 * blink;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(lz.x, lz.y); ctx.lineTo(ex, ey); ctx.stroke();
+        }
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.5 + 0.5 * k;
+        drawGlow(lz.x, lz.y, 14 + k * 46, lz.color);
+        drawGlow(lz.x, lz.y, 6 + k * 14, '#ffffff');
         ctx.fillStyle = lz.color;
-        ctx.fillRect(Math.round(lz.x) - 4, Math.round(lz.y) - 4, 8, 8);
+        for (let i = 0; i < 7; i++) {
+          const ph = (fxT * 1.8 + i / 7) % 1;
+          const ang = i * 0.9 + fxT * 4, rad = 55 * (1 - ph);
+          ctx.globalAlpha = ph * (0.4 + 0.6 * k);
+          ctx.fillRect(Math.round(lz.x + Math.cos(ang) * rad) - 2, Math.round(lz.y + Math.sin(ang) * rad) - 2, 4, 4);
+        }
       } else {
         const f = lz.active / LASER_ON;
-        const w = lz.width * (0.6 + 0.4 * f) + rand(-1.5, 1.5);
-        ctx.globalAlpha = 0.35 + 0.6 * f;
+        const w = lz.width * (0.7 + 0.5 * f) + rand(-2, 2);
+        ctx.globalAlpha = 0.3 * f + 0.08;
         ctx.strokeStyle = lz.color;
-        ctx.lineWidth = w + 8;
+        ctx.lineWidth = w * 2.6;
         ctx.beginPath(); ctx.moveTo(lz.x, lz.y); ctx.lineTo(ex, ey); ctx.stroke();
-        ctx.globalAlpha = 0.9 * f + 0.1;
+        ctx.globalAlpha = 0.85 * f + 0.15;
+        ctx.lineWidth = w * 1.3;
+        ctx.beginPath(); ctx.moveTo(lz.x, lz.y); ctx.lineTo(ex, ey); ctx.stroke();
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = w * 0.45;
+        ctx.lineWidth = w * 0.5;
         ctx.beginPath(); ctx.moveTo(lz.x, lz.y); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.globalAlpha = 0.6 * f + 0.2;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.beginPath();
+        const nx = -Math.sin(lz.a), ny = Math.cos(lz.a);
+        for (let d = 0; d <= L; d += 18) {
+          const o = Math.sin(d * 0.08 - fxT * 40) * w * 0.7;
+          const px = lz.x + Math.cos(lz.a) * d + nx * o, py = lz.y + Math.sin(lz.a) * d + ny * o;
+          d ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        }
+        ctx.stroke();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = f * 0.8 + 0.2;
+        drawGlow(ex, ey, w * 4, lz.color);
+        drawGlow(ex, ey, w * 1.6, '#ffffff');
+        drawGlow(lz.x, lz.y, w * 3.5, lz.color);
+        drawGlow(lz.x, lz.y, w * 1.4, '#ffffff');
       }
       ctx.restore();
     }
@@ -1742,23 +1818,130 @@
     ctx.globalAlpha = 1;
   }
 
-  function render() {
-    ctx.clearRect(0, 0, W, H);
-    if (state === 'boot' || !player) return;
+  const glowCache = new Map();
+  function hexRgb(c) {
+    let m = /^#([0-9a-f]{6})$/i.exec(c);
+    if (m) { const n = parseInt(m[1], 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+    m = /^#([0-9a-f]{3})$/i.exec(c);
+    if (m) return m[1].split('').map(h => parseInt(h + h, 16));
+    m = /rgba?\(([^)]+)\)/.exec(c);
+    if (m) return m[1].split(',').slice(0, 3).map(v => parseFloat(v));
+    return [255, 255, 255];
+  }
+  function glowSprite(color) {
+    let cv = glowCache.get(color);
+    if (cv) return cv;
+    cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const g = cv.getContext('2d');
+    const [r, gg, b] = hexRgb(color);
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, `rgba(${r},${gg},${b},1)`);
+    grad.addColorStop(0.25, `rgba(${r},${gg},${b},0.55)`);
+    grad.addColorStop(0.6, `rgba(${r},${gg},${b},0.15)`);
+    grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    glowCache.set(color, cv);
+    return cv;
+  }
+  function drawGlow(x, y, r, color) {
+    if (r <= 0) return;
+    ctx.drawImage(glowSprite(color), x - r, y - r, r * 2, r * 2);
+  }
+
+  const lightCv = document.createElement('canvas');
+  const lctx = lightCv.getContext('2d');
+  const LIGHT_SCALE = 0.5;
+  const SOFT = (() => {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 128;
+    const g = cv.getContext('2d');
+    const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.4, 'rgba(255,255,255,0.6)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 128, 128);
+    return cv;
+  })();
+  let vignette = null, vignetteKey = '';
+
+  function drawLighting() {
+    const amb = state === 'wave' ? 0.64 : 0.22;
+    const lw = Math.ceil(W * LIGHT_SCALE), lh = Math.ceil(H * LIGHT_SCALE);
+    if (lightCv.width !== lw || lightCv.height !== lh) { lightCv.width = lw; lightCv.height = lh; }
+    lctx.setTransform(1, 0, 0, 1, 0, 0);
+    lctx.globalCompositeOperation = 'source-over';
+    lctx.globalAlpha = 1;
+    lctx.clearRect(0, 0, lw, lh);
+    lctx.fillStyle = `rgba(6,8,24,${amb})`;
+    lctx.fillRect(0, 0, lw, lh);
+    lctx.globalCompositeOperation = 'destination-out';
+    lctx.setTransform(LIGHT_SCALE, 0, 0, LIGHT_SCALE, 0, 0);
+    const light = (x, y, r, a) => { lctx.globalAlpha = Math.min(1, a); lctx.drawImage(SOFT, x - r, y - r, r * 2, r * 2); };
+    if (state !== 'dead') light(player.x, player.y, 150, 0.95);
+    for (const e of enemies) light(e.x, e.y, e.kind === 'boss' ? 170 : e.r * 2.6, e.kind === 'boss' ? 0.6 : 0.3);
+    for (const b of bullets) light(b.x, b.y, b.from === 'player' ? 46 : 22 + b.r * 4, 0.5);
+    for (const pu of powerups) light(pu.x, pu.y, 70, 0.6);
+    for (const f of flashes) light(f.x, f.y, f.r * 3, f.life / f.max);
+    for (const r of rings) light(r.x, r.y, r.r + r.rmax * 0.3, (r.life / r.max) * 0.6);
+    for (const lz of lasers) {
+      const L = rayLength(lz.x, lz.y, lz.a);
+      const on = lz.warn <= 0;
+      const k = on ? lz.active / LASER_ON : (1 - lz.warn / LASER_WARN) * 0.35;
+      const rad = on ? 70 : 30;
+      for (let d = 0; d <= L; d += rad * 0.6) light(lz.x + Math.cos(lz.a) * d, lz.y + Math.sin(lz.a) * d, rad, k);
+    }
+    ctx.drawImage(lightCv, 0, 0, W, H);
 
     ctx.save();
-    if (shake > 0) ctx.translate(rand(-shake, shake) * 0.5, rand(-shake, shake) * 0.5);
+    ctx.globalCompositeOperation = 'lighter';
+    for (const lz of lasers) {
+      if (lz.warn > 0) continue;
+      const L = rayLength(lz.x, lz.y, lz.a);
+      ctx.globalAlpha = 0.18 * (lz.active / LASER_ON) + 0.04;
+      for (let d = 0; d <= L; d += 50) drawGlow(lz.x + Math.cos(lz.a) * d, lz.y + Math.sin(lz.a) * d, 90, lz.color);
+    }
+    for (const b of bullets) {
+      if (b.from === 'player') continue;
+      ctx.globalAlpha = 0.12;
+      drawGlow(b.x, b.y, 40 + b.r * 4, b.color);
+    }
+    for (const f of flashes) {
+      ctx.globalAlpha = 0.3 * f.life / f.max;
+      drawGlow(f.x, f.y, f.r * 3, f.color);
+    }
+    ctx.restore();
 
-    ctx.fillStyle = state === 'wave' ? 'rgba(255,255,255,.3)' : 'rgba(255,255,255,.12)';
-    ctx.fillRect(0, 0, W, H);
-    drawHud();
+    if (state === 'wave') {
+      const key = W + 'x' + H;
+      if (vignetteKey !== key) {
+        vignetteKey = key;
+        vignette = document.createElement('canvas');
+        vignette.width = Math.ceil(W / 4); vignette.height = Math.ceil(H / 4);
+        const g = vignette.getContext('2d');
+        const grad = g.createRadialGradient(vignette.width / 2, vignette.height / 2, Math.min(vignette.width, vignette.height) * 0.35, vignette.width / 2, vignette.height / 2, Math.hypot(vignette.width, vignette.height) / 2);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(0,0,10,0.45)');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, vignette.width, vignette.height);
+      }
+      ctx.drawImage(vignette, 0, 0, W, H);
+    }
+  }
 
-    for (const pu of powerups) drawPowerup(pu);
-    for (const e of enemies) if (e.kind === 'necessary') drawEnemy(e);
-    for (const e of enemies) if (e.kind !== 'necessary') drawEnemy(e);
-
+  function drawBullets() {
+    ctx.lineCap = 'round';
     for (const b of bullets) {
       if (b.from === 'player') {
+        for (let i = 3; i >= 1; i--) {
+          ctx.globalAlpha = 0.35 / i;
+          ctx.fillStyle = '#4f86f7';
+          const s = 12 - i * 2;
+          ctx.fillRect(Math.round(b.x - b.vx * 0.014 * i) - s / 2, Math.round(b.y - b.vy * 0.014 * i) - s / 2, s, s);
+        }
+        ctx.globalAlpha = 1;
         ctx.fillStyle = '#0d3a9e';
         ctx.fillRect(Math.round(b.x) - 6, Math.round(b.y) - 6, 12, 12);
         ctx.fillStyle = '#4f86f7';
@@ -1766,16 +1949,105 @@
         ctx.fillStyle = '#dfe9ff';
         ctx.fillRect(Math.round(b.x) - 2, Math.round(b.y) - 2, 4, 4);
       } else {
+        const sp = hyp(b.vx, b.vy) || 1, tl = b.r * 5;
+        ctx.globalAlpha = 0.5;
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = b.r * 1.5;
+        ctx.beginPath();
+        ctx.moveTo(b.x - b.vx / sp * tl, b.y - b.vy / sp * tl);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
         ctx.fillStyle = b.color;
         ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.arc(b.x, b.y, b.r + 1, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#fff';
-        ctx.fillRect(Math.round(b.x) - 1, Math.round(b.y) - 1, 1, 1);
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, Math.max(1.2, b.r * 0.55), 0, Math.PI * 2);
+        ctx.fill();
+        if (b.r >= 7) {
+          ctx.strokeStyle = b.color;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 5]);
+          ctx.lineDashOffset = -fxT * 40;
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.r + 5 + Math.sin(fxT * 20) * 1.5, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
       }
     }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawGlowPass() {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const e of enemies) {
+      if (e.kind === 'boss' && e.spawnT <= 0) {
+        ctx.globalAlpha = 0.28 + Math.sin(fxT * 4) * 0.08;
+        drawGlow(e.x, e.y, e.r * 3, BOSS_COLORS[e.variant] || '#aa00ff');
+      } else if (e.hitFlash > 0) {
+        ctx.globalAlpha = 0.6;
+        drawGlow(e.x, e.y, e.r * 2, '#fff3d0');
+      }
+    }
+    for (const b of bullets) {
+      if (b.from === 'player') { ctx.globalAlpha = 0.55; drawGlow(b.x, b.y, 26, '#4f86f7'); }
+      else { ctx.globalAlpha = 0.5; drawGlow(b.x, b.y, b.r * 5 + 6, b.color); }
+    }
+    for (const p of particles) {
+      if (!p.spark) continue;
+      ctx.globalAlpha = clamp(p.life / p.max * 1.4, 0, 1);
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(p.x - p.vx * 0.035, p.y - p.vy * 0.035);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+    for (const r of rings) {
+      const t = 1 - r.life / r.max;
+      const rad = r.r + (r.rmax - r.r) * (1 - Math.pow(1 - t, 3));
+      ctx.globalAlpha = (1 - t) * 0.9;
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = Math.max(1, r.w * (1 - t));
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, rad, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    for (const f of flashes) {
+      ctx.globalAlpha = f.life / f.max;
+      drawGlow(f.x, f.y, f.r, f.color);
+      drawGlow(f.x, f.y, f.r * 0.4, '#ffffff');
+    }
+    if (state !== 'dead' && player) {
+      ctx.globalAlpha = player.dashT > 0 ? 0.7 : 0.3;
+      drawGlow(player.x, player.y, player.dashT > 0 ? 50 : 34, '#7fa7ff');
+    }
+    ctx.restore();
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    fxT += 1 / 60;
+    if (state === 'boot' || !player) return;
+
+    ctx.save();
+    if (shake > 0) ctx.translate(rand(-shake, shake) * 0.5, rand(-shake, shake) * 0.5);
+
+    drawLighting();
+    drawHud();
+
+    for (const pu of powerups) drawPowerup(pu);
+    for (const e of enemies) if (e.kind === 'necessary') drawEnemy(e);
+    for (const e of enemies) if (e.kind !== 'necessary') drawEnemy(e);
+
+    drawBullets();
 
     for (const p of particles) {
+      if (p.spark) continue;
       ctx.globalAlpha = clamp(p.life / p.max * 1.5, 0, 1);
       ctx.fillStyle = p.color;
       ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
@@ -1786,6 +2058,7 @@
     drawGhosts();
     drawSlashes();
     drawPlayer();
+    drawGlowPass();
 
     for (const f of floaters) {
       ctx.globalAlpha = clamp(f.life / f.max * 2, 0, 1);
@@ -1800,7 +2073,14 @@
     ctx.restore();
 
     if (flashRed > 0) {
-      ctx.fillStyle = `rgba(220,30,30,${flashRed * 0.5})`;
+      const grad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.hypot(W, H) / 2);
+      grad.addColorStop(0, 'rgba(220,30,30,0)');
+      grad.addColorStop(1, `rgba(220,30,30,${Math.min(0.55, flashRed * 1.6)})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (whiteFlash > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${whiteFlash * 0.55})`;
       ctx.fillRect(0, 0, W, H);
     }
 
