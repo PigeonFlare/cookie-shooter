@@ -858,7 +858,7 @@
         orbitA: rand(0, 6.3), orbitDir: Math.random() < 0.5 ? 1 : -1, hopT: 0, hopX: x, hopY: y, homeX: x, homeY: y, bulletSpeed: 150 * Math.min(1.5, wp.spd), shots: 0, shotT: 0, spinA: rand(0, 6.3) });
     } else {
       Object.assign(e, { r: 46, scale: 7, hp: 420 * wp.hp, speed: 45 * wp.spd, dmg: 13 * wp.dmg, touch: 35 * wp.dmg, bulletSpeed: 150, shots: 0, shotT: 0, spinA: 0,
-        phase: 'orbit', phaseT: 3, orbitA: 0, orbitDir: 1, windup: 0, chargesLeft: 0, fadeT: 0, trailT: 0 });
+        phase: 'orbit', phaseT: 3, orbitA: 0, orbitDir: 1, windup: 0, chargesLeft: 0, fadeT: 0, trailT: 0, variant: pick(BOSS_VARIANTS), fireCd: 1.2 });
       setStatus(`Warning: ${info.n} from ${info.d} is regenerating itself...`);
     }
     e.maxHp = e.hp;
@@ -1172,123 +1172,88 @@
   }
 
   const PATTERNS = [
-    { id: 'aimed', from: 1 },
-    { id: 'spread', from: 1 },
-    { id: 'ring', from: 2 },
-    { id: 'burst', from: 3 },
-    { id: 'laser', from: 3 },
-    { id: 'wave', from: 4 },
-    { id: 'spiral', from: 5 }
+    { id: 'burst3', from: 1 },
+    { id: 'heavy', from: 1 },
+    { id: 'laser', from: 2 }
   ];
-  const PATTERN_COLORS = { aimed: '#e0157a', spread: '#e0157a', ring: '#ff6d00', burst: '#d50000', wave: '#00897b', spiral: '#2962ff', laser: '#ff1744', boss: '#aa00ff' };
+  const PATTERN_COLORS = { burst3: '#e0157a', heavy: '#d50000', laser: '#ff1744' };
+  const BOSS_VARIANTS = ['ring6', 'laser4', 'leadBurst'];
+  const BOSS_COLORS = { ring6: '#aa00ff', laser4: '#d500f9', leadBurst: '#6200ea' };
 
-  const BOSS_PHASES = ['orbit', 'charge', 'spiral', 'teleport', 'summon', 'laser'];
+  const BOSS_PHASES = ['orbit', 'charge', 'teleport'];
 
   function bossNextPhase(e) {
-    if (e.phase === 'charge' && e.windup <= 0) {
-      const n = 18, off = rand(0, Math.PI);
-      for (let i = 0; i < n; i++) enemyShoot(e, off + i * Math.PI * 2 / n, 160 * rand(0.9, 1.1), e.dmg, '#aa00ff');
-      shake = Math.min(14, shake + 6);
-      if (e.chargesLeft > 0) {
-        e.chargesLeft--;
-        e.windup = 0.55; e.trailT = 0; e.phaseT = 1.15;
-        return;
-      }
+    if (e.phase === 'charge' && e.windup <= 0 && e.chargesLeft > 0) {
+      e.chargesLeft--;
+      e.windup = 0.55; e.phaseT = 1.15;
+      return;
     }
     e.ghost = false;
     let next;
     do { next = pick(BOSS_PHASES); } while (next === e.phase);
-    if (next === 'summon' && enemies.filter(o => o.kind === 'chaser').length > 8) next = 'orbit';
+    if (next !== 'orbit' && Math.random() < 0.4) next = 'orbit';
     e.phase = next;
-    if (next === 'orbit') { e.phaseT = 4.5; e.orbitA = Math.atan2(e.y - player.y, e.x - player.x) + Math.PI; e.orbitDir = Math.random() < 0.5 ? 1 : -1; e.fireCd = 0.5; }
-    else if (next === 'charge') { e.phaseT = 1.25; e.windup = 0.8; e.trailT = 0; e.chargesLeft = 1 + (Math.random() < 0.5 ? 1 : 0); }
-    else if (next === 'spiral') { e.phaseT = 3.6; e.shots = 44; e.shotT = 0.4; e.burstAim = false; }
-    else if (next === 'laser') {
-      e.phaseT = 3.4;
-      e.laserStage = 0;
-      const aim = Math.atan2(player.y - e.y, player.x - e.x);
-      for (let i = -1; i <= 1; i++) {
-        fireLaser(e, aim + i * 0.42, e.dmg * 2.4, '#aa00ff', 20);
-        fireLaser(e, aim + Math.PI + i * 0.42, e.dmg * 2.4, '#aa00ff', 20);
-      }
-    }
+    if (next === 'orbit') { e.phaseT = 4.5; e.orbitA = Math.atan2(e.y - player.y, e.x - player.x) + Math.PI; e.orbitDir = Math.random() < 0.5 ? 1 : -1; }
+    else if (next === 'charge') { e.phaseT = 1.25; e.windup = 0.8; e.chargesLeft = Math.random() < 0.5 ? 1 : 0; }
     else if (next === 'teleport') { e.phaseT = 1.3; e.fadeT = 0.45; sfx(300, 0.3, 'triangle', 0.05, 900); }
-    else if (next === 'summon') {
-      e.phaseT = 1.6;
-      const n = 2 + Math.min(3, Math.floor(wave / 10));
-      for (let i = 0; i < n; i++) {
-        const a = i * Math.PI * 2 / n + rand(-0.3, 0.3);
-        spawn({ kind: 'chaser' }, clamp(e.x + Math.cos(a) * 70, 30, W - 30), clamp(e.y + Math.sin(a) * 70, 40, H - 30));
-      }
-      floaters.push({ x: e.x, y: e.y - 70, text: 'RESPAWNING DELETED COOKIES...', color: '#aa00ff', life: 1.4, max: 1.4 });
-      updateBadge();
-    }
   }
 
-  function shooterFire(e, aim) {
-    const sp = () => e.bulletSpeed * rand(0.85, 1.15);
-    const col = PATTERN_COLORS[e.pattern];
+  function bossFire(e, aim) {
+    const col = BOSS_COLORS[e.variant];
     const fr = waveInfo.fireRate;
-    switch (e.pattern) {
-      case 'aimed':
-        enemyShoot(e, aim + rand(-0.1, 0.1), sp() * 1.15, e.dmg, col, { lead: true });
-        e.shots = 1 + Math.min(2, Math.floor(wave / 4)); e.shotT = 0.18; e.burstAim = true;
-        e.fireCd = rand(1.3, 1.9) / fr;
-        break;
-      case 'spread': {
-        const n = 3 + Math.min(4, Math.floor(wave / 3)) * 1;
-        const s = sp();
-        for (let i = 0; i < n; i++) enemyShoot(e, aim + (i - (n - 1) / 2) * 0.2, s, e.dmg, col, { lead: true });
-        e.fireCd = rand(1.7, 2.3) / fr;
-        break;
-      }
-      case 'ring': {
-        const n = 8 + Math.min(10, wave);
-        const off = rand(0, Math.PI * 2), s = sp() * 0.85;
-        for (let i = 0; i < n; i++) enemyShoot(e, off + i * Math.PI * 2 / n, s, e.dmg, col);
-        e.fireCd = rand(2.2, 2.8) / fr;
-        break;
-      }
-      case 'burst':
-        e.shots = 5 + Math.min(5, Math.floor(wave / 3)); e.shotT = 0; e.burstAim = true;
-        e.fireCd = rand(2.4, 3) / fr;
-        break;
-      case 'wave': {
-        const s = sp();
-        for (let i = -1; i <= 1; i++) enemyShoot(e, aim + i * 0.3, s, e.dmg, col, { wob: 45, wf: 7, lead: true });
-        e.fireCd = rand(1.6, 2.1) / fr;
-        break;
-      }
-      case 'spiral':
-        e.shots = 18 + Math.min(12, wave); e.shotT = 0; e.burstAim = false;
-        e.fireCd = rand(3, 3.6) / fr;
-        break;
-      case 'laser':
-        fireLaser(e, aim, e.dmg * 2.2, col, 14);
-        fireLaser(e, aim + Math.PI, e.dmg * 2.2, col, 14);
-        if (wave >= 8) { fireLaser(e, aim + Math.PI / 2, e.dmg * 2.2, col, 14); fireLaser(e, aim - Math.PI / 2, e.dmg * 2.2, col, 14); }
-        e.fireCd = rand(3.6, 4.4) / fr;
-        return;
+    if (e.variant === 'ring6') {
+      e.spinA += rand(0.25, 0.45);
+      const s = 230 * rand(0.95, 1.05);
+      for (let i = 0; i < 6; i++) enemyShoot(e, e.spinA + i * Math.PI / 3, s, e.dmg, col, { r: 5 });
+      e.fireCd = 0.75 / fr;
+    } else if (e.variant === 'laser4') {
+      for (let i = 0; i < 4; i++) fireLaser(e, aim + i * Math.PI / 2, e.dmg * 2.4, col, 20);
+      e.fireCd = (LASER_WARN + LASER_ON + 0.9) / fr;
+      return;
+    } else {
+      e.shots = 6 + Math.min(4, Math.floor(wave / 10));
+      e.shotT = 0;
+      e.burstSpeed = 300 * rand(0.95, 1.05);
+      e.burstA = leadAim(e, e.burstSpeed);
+      e.fireCd = 1.7 / fr;
+      return;
     }
     SND.enemyShot();
   }
 
-  function shooterStream(e, dt, aim) {
+  function shooterFire(e, aim) {
+    const col = PATTERN_COLORS[e.pattern];
+    const fr = waveInfo.fireRate;
+    switch (e.pattern) {
+      case 'burst3':
+        e.shots = 3; e.shotT = 0;
+        e.fireCd = rand(1.5, 2.1) / fr;
+        return;
+      case 'heavy':
+        enemyShoot(e, aim, e.bulletSpeed * rand(1.05, 1.2), e.dmg * 1.8, col, { lead: true, r: 8 });
+        e.fireCd = rand(2, 2.6) / fr;
+        sfx(320, 0.12, 'square', 0.04, -180);
+        return;
+      case 'laser':
+        fireLaser(e, aim, e.dmg * 2.2, col, 14);
+        e.fireCd = rand(3.4, 4.2) / fr;
+        return;
+    }
+  }
+
+  function shooterStream(e, dt) {
     if (e.shots <= 0) return;
     e.shotT -= dt;
     if (e.shotT > 0) return;
     e.shots--;
-    const col = PATTERN_COLORS[e.pattern];
-    if (e.burstAim) {
-      enemyShoot(e, aim + rand(-0.15, 0.15), e.bulletSpeed * rand(1, 1.3), e.dmg, col, { lead: true });
-      e.shotT = 0.09;
+    if (e.kind === 'boss') {
+      enemyShoot(e, e.burstA, e.burstSpeed, e.dmg, BOSS_COLORS[e.variant]);
+      e.shotT = 0.08;
     } else {
-      e.spinA += 0.42;
-      const arms = e.kind === 'boss' ? 4 : 2;
-      for (let i = 0; i < arms; i++) enemyShoot(e, e.spinA + i * Math.PI * 2 / arms, e.bulletSpeed * rand(0.8, 1), e.dmg, col);
-      e.shotT = e.kind === 'boss' ? 0.07 : 0.1;
+      enemyShoot(e, Math.atan2(player.y - e.y, player.x - e.x), e.bulletSpeed * rand(1.35, 1.5), e.dmg, PATTERN_COLORS[e.pattern], { lead: true });
+      e.shotT = 0.11;
     }
-    if (e.shots % 3 === 0) SND.enemyShot();
+    SND.enemyShot();
   }
 
   function leadAim(e, speed) {
@@ -1378,26 +1343,17 @@
           tvx = ox / od * sp; tvy = oy / od * sp;
         }
         if (lasers.some(lz => lz.owner === e)) { tvx *= 0.15; tvy *= 0.15; }
-        shooterStream(e, dt, aim);
+        shooterStream(e, dt);
         e.fireCd -= dt;
         if (e.fireCd <= 0 && e.shots <= 0) shooterFire(e, aim);
       } else if (e.kind === 'boss') {
         const aim = Math.atan2(dy, dx);
         const rage = e.hp < e.maxHp * 0.4 ? 1.35 : 1;
-        e.pattern = 'boss';
-        shooterStream(e, dt, aim);
+        shooterStream(e, dt);
         e.phaseT -= dt * rage;
         if (e.phaseT <= 0) bossNextPhase(e);
         e.fireCd -= dt * rage;
-        if (e.fireCd <= 0 && !e.ghost) {
-          e.fireCd = (e.phase === 'orbit' ? 1.0 : 1.6) / waveInfo.fireRate;
-          const sp = 260 * rand(0.9, 1.1);
-          const lead = leadAim(e, sp) - aim;
-          for (let m = 0; m < 4; m++) {
-            for (let i = -1; i <= 1; i++) enemyShoot(e, aim + lead + m * Math.PI / 2 + i * 0.14, sp, e.dmg, '#aa00ff');
-          }
-          SND.enemyShot();
-        }
+        if (e.fireCd <= 0 && e.shots <= 0 && !e.ghost) bossFire(e, aim);
         steer = 2;
         if (e.phase === 'orbit') {
           e.orbitA += dt * 0.75 * e.orbitDir * rage;
@@ -1414,17 +1370,7 @@
             tvx = Math.cos(e.chargeA) * 600 * rage;
             tvy = Math.sin(e.chargeA) * 600 * rage;
             steer = 10;
-            e.trailT -= dt;
-            if (e.trailT <= 0) {
-              e.trailT = 0.12;
-              enemyShoot(e, e.chargeA + Math.PI / 2, 55 * rand(0.8, 1.2), e.dmg, '#aa00ff');
-              enemyShoot(e, e.chargeA - Math.PI / 2, 55 * rand(0.8, 1.2), e.dmg, '#aa00ff');
-            }
           }
-        } else if (e.phase === 'spiral') {
-          const ox = W / 2 - e.x, oy = H / 2 - e.y, od = hyp(ox, oy) || 1;
-          const sp = Math.min(e.speed * 2, od * 2);
-          tvx = ox / od * sp; tvy = oy / od * sp;
         } else if (e.phase === 'teleport') {
           if (e.fadeT > 0) {
             e.fadeT -= dt * rage;
@@ -1435,24 +1381,14 @@
               e.x = tx; e.y = ty; e.vx = 0; e.vy = 0;
               e.ghost = false;
               e.appearT = 0.35;
-              burst(e.x, e.y, '#aa00ff', 24);
-              const n = 24, off = rand(0, Math.PI);
-              for (let i = 0; i < n; i++) enemyShoot(e, off + i * Math.PI * 2 / n, 140 * rand(0.9, 1.1), e.dmg, '#aa00ff', { wob: 25, wf: 4 });
+              burst(e.x, e.y, BOSS_COLORS[e.variant], 24);
               sfx(1200, 0.25, 'triangle', 0.05, -1000);
             }
           }
           e.appearT = Math.max(0, (e.appearT || 0) - dt);
           tvx = 0; tvy = 0;
-        } else if (e.phase === 'laser') {
-          tvx = 0; tvy = 0; steer = 4;
-          if (e.laserStage === 0 && e.phaseT < 2.2) {
-            e.laserStage = 1;
-            const off = Math.atan2(player.y - e.y, player.x - e.x);
-            for (let i = 0; i < 4; i++) fireLaser(e, off + i * Math.PI / 2, e.dmg * 2.4, '#d500f9', 20);
-          }
-        } else if (e.phase === 'summon') {
-          tvx = Math.cos(e.t * 30) * 30; tvy = 0;
         }
+        if (lasers.some(lz => lz.owner === e)) { tvx *= 0.2; tvy *= 0.2; }
       }
 
       if (flow && !(e.kind === 'boss' && e.phase !== 'orbit')) {
@@ -1606,7 +1542,7 @@
     ctx.save();
     ctx.translate(Math.round(e.x), Math.round(e.y));
     if (e.kind === 'chaser') ctx.rotate(Math.sin(e.t * 10) * 0.12);
-    if (e.kind === 'boss' && ((e.phase === 'charge' && e.windup > 0) || e.phase === 'summon')) ctx.translate(rand(-2, 2), rand(-2, 2));
+    if (e.kind === 'boss' && ((e.phase === 'charge' && e.windup > 0))) ctx.translate(rand(-2, 2), rand(-2, 2));
     if (e.kind === 'necessary') {
       ctx.strokeStyle = 'rgba(46,125,50,.45)';
       ctx.lineWidth = 2;
