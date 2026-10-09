@@ -558,28 +558,82 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
 
   let cloneLayer = null;
 
+  const SKIP_TAGS = new Set(['script', 'style', 'link', 'meta', 'template', 'noscript', 'iframe', 'object', 'embed', 'video', 'audio', 'canvas', 'dialog']);
+  const SKIP_ATTRS = new Set(['id', 'class', 'style', 'name', 'is', 'slot', 'part', 'srcdoc', 'autofocus', 'autoplay', 'contenteditable', 'tabindex', 'popover']);
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
   function copyStyles(src, dst) {
     const cs = getComputedStyle(src);
+    const st = dst.style;
     for (let i = 0; i < cs.length; i++) {
       const prop = cs[i];
-      dst.style.setProperty(prop, cs.getPropertyValue(prop));
+      st.setProperty(prop, cs.getPropertyValue(prop));
     }
+  }
+
+  function copySvgStyles(src, dst) {
+    copyStyles(src, dst);
     const sk = src.children, dk = dst.children;
-    for (let i = 0; i < sk.length && i < dk.length; i++) copyStyles(sk[i], dk[i]);
+    for (let i = 0; i < sk.length && i < dk.length; i++) copySvgStyles(sk[i], dk[i]);
+  }
+
+  function renderedChildren(el) {
+    const out = [];
+    for (const n of (el.shadowRoot || el).childNodes) {
+      if (n.localName === 'slot' && n.assignedNodes) {
+        const a = n.assignedNodes({ flatten: true });
+        out.push(...(a.length ? a : n.childNodes));
+      } else out.push(n);
+    }
+    return out;
+  }
+
+  function cloneTree(src, budget) {
+    if (src.nodeType === 3) return document.createTextNode(src.data);
+    if (src.nodeType !== 1 || budget.n-- <= 0) return null;
+    const tag = src.localName;
+    if (SKIP_TAGS.has(tag)) return null;
+    if (src.namespaceURI === SVG_NS) {
+      const svg = src.cloneNode(true);
+      svg.querySelectorAll('script, foreignObject').forEach(n => n.remove());
+      copySvgStyles(src, svg);
+      return svg;
+    }
+    if (src.namespaceURI !== 'http://www.w3.org/1999/xhtml') return null;
+    const dst = document.createElement(tag.includes('-') ? 'div' : tag);
+    for (const a of src.attributes) {
+      const n = a.name.toLowerCase();
+      if (SKIP_ATTRS.has(n) || n.startsWith('on')) continue;
+      try { dst.setAttribute(a.name, a.value); } catch {}
+    }
+    copyStyles(src, dst);
+    if ((tag === 'input' || tag === 'textarea' || tag === 'select') && src.value) {
+      try { dst.value = src.value; } catch {}
+    }
+    if (tag === 'img' && src.currentSrc) dst.setAttribute('src', src.currentSrc);
+    for (const k of renderedChildren(src)) {
+      const c = cloneTree(k, budget);
+      if (c) dst.appendChild(c);
+      if (budget.n <= 0) break;
+    }
+    return dst;
   }
 
   function makeClone(el) {
     if (!cloneLayer) {
       cloneLayer = document.createElement('div');
-      cloneLayer.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483646;pointer-events:none;overflow:visible;display:block;';
-      document.documentElement.appendChild(cloneLayer);
+      cloneLayer.style.cssText = 'all:initial;position:fixed;inset:0;z-index:0;pointer-events:none;overflow:visible;display:block;';
+      root.insertBefore(cloneLayer, root.firstChild);
     }
     const r = el.getBoundingClientRect();
-    const c = el.cloneNode(true);
-    c.removeAttribute('id');
-    c.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
-    copyStyles(el, c);
-    if ('value' in el && el.value) c.value = el.value;
+    let c;
+    try {
+      c = cloneTree(el, { n: 200 });
+    } catch {}
+    if (!c || c.nodeType !== 1) {
+      c = document.createElement('div');
+      try { copyStyles(el, c); } catch {}
+    }
     const st = c.style;
     st.setProperty('position', 'fixed');
     st.setProperty('left', r.left + 'px');
@@ -601,6 +655,8 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
   function moveElement(e) {
     const el = e.el;
     if (!e.clone) {
+      if (clonesThisFrame > 0 && performance.now() - frameStart > 8) return;
+      clonesThisFrame++;
       e.clone = makeClone(el);
       if (!moved.has(el)) moved.set(el, { visibility: [el.style.getPropertyValue('visibility'), el.style.getPropertyPriority('visibility')], clones: [] });
       moved.get(el).clones.push(e.clone);
@@ -2263,8 +2319,12 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
   let remeasureT = 0;
   const savedOverflow = { html: '', body: '' };
 
+  let frameStart = 0, clonesThisFrame = 0, loopErr = false;
+
   function frame(now) {
     if (!running) return;
+    frameStart = performance.now();
+    clonesThisFrame = 0;
     const raw = (now - last) / 1000;
     const dt = Math.min(0.05, raw);
     last = now;
@@ -2274,9 +2334,13 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     }
     remeasureT -= dt;
     if (remeasureT <= 0) { remeasureT = 1; measureObstacles(); }
-    update(dt);
-    render();
-    updateWeaponUi();
+    try {
+      update(dt);
+      render();
+      updateWeaponUi();
+    } catch (err) {
+      if (!loopErr) { loopErr = true; console.warn('Cookie Shooter:', err); }
+    }
     rafId = requestAnimationFrame(frame);
   }
 
