@@ -193,6 +193,14 @@
       '....DLLLD',
       'K....DDD.',
       '.........'] },
+    laser: { pal: { W: '#ffffff', B: '#4f86f7', D: '#1851ce' }, rows: [
+      '.........',
+      'DD.......',
+      'DBBBBBBBB',
+      'DBWWWWWWW',
+      'DBBBBBBBB',
+      'DD.......',
+      '.........'] },
     dash: { pal: { B: '#1851ce', L: '#7fa7ff' }, rows: [
       'L...B....',
       'LL..BB...',
@@ -239,7 +247,8 @@
     for (const k in weaponBtns) weaponBtns[k].classList.toggle('active', k === w);
   }
 
-  const CD_MAX = { swing: 0.42, shoot: 0.16, dash: 0.9 };
+  const PLAYER_LASER_WARN = 1, PLAYER_LASER_CD = 5;
+  const CD_MAX = { swing: 0.42, shoot: 0.16, laser: PLAYER_LASER_WARN + PLAYER_LASER_CD, dash: 0.9 };
   function updateWeaponUi() {
     for (const k in weaponBtns) {
       const f = clamp(cds[k] / CD_MAX[k], 0, 1);
@@ -284,7 +293,7 @@
   let loadedThisWave = 0, domainsThisWave = new Set();
   let idleHintT = 0;
   let weapon = 'shoot';
-  const cds = { swing: 0, shoot: 0, dash: 0 };
+  const cds = { swing: 0, shoot: 0, laser: 0, dash: 0 };
   let slashes = [], ghosts = [], lasers = [];
   let swingDir = 1;
 
@@ -327,7 +336,8 @@
     if ((k === 'enter' || k === 'n') && state === 'idle') startWave();
     if (k === '1') setWeapon('swing');
     if (k === '2') setWeapon('shoot');
-    if (k === '3') setWeapon('dash');
+    if (k === '3') setWeapon('laser');
+    if (k === '4') setWeapon('dash');
   });
   window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
   window.addEventListener('blur', () => {
@@ -355,7 +365,7 @@
     if (!popup.classList.contains('hidden')) { closePopup(); return; }
     const p = canvasPos(e.touches[0]);
     touch.active = true; touch.x = p.x; touch.y = p.y;
-    if (weapon === 'dash') touch.dashReq = true;
+    if (weapon === 'dash' || weapon === 'laser') touch.dashReq = true;
   }, { passive: false });
   canvas.addEventListener('touchmove', e => {
     e.preventDefault();
@@ -934,7 +944,7 @@
     for (const f of floaters) { f.life -= dt; f.y -= (f.big ? 8 : 26) * dt; }
     for (const sl of slashes) { sl.life -= dt; sl.x = player.x; sl.y = player.y; }
     for (const lz of lasers) {
-      if (lz.owner && !lz.owner.dead && lz.warn > 0) { lz.x = lz.owner.x; lz.y = lz.owner.y; }
+      if (lz.owner && !lz.owner.dead && lz.warn > 0) { lz.x = lz.owner.x; lz.y = lz.owner.y; if (lz.mine) lz.a = lz.owner.angle; }
       if (lz.owner && lz.owner.dead && lz.warn > 0) lz.gone = true;
       if (paused || (state !== 'wave' && state !== 'idle')) continue;
       if (lz.warn > 0) {
@@ -948,9 +958,20 @@
       } else {
         lz.active -= dt;
         shake = Math.max(shake, 4);
-        const L = rayLength(lz.x, lz.y, lz.a);
+        const L = laserLength(lz);
         if (Math.random() < 0.8) sparks(lz.x + Math.cos(lz.a) * L, lz.y + Math.sin(lz.a) * L, Math.random() < 0.5 ? '#ffffff' : lz.color, 2, lz.a + Math.PI, 1.2, 300);
-        if (!lz.hit && state === 'wave') {
+        if (lz.mine) {
+          if (!lz.hit) {
+            lz.hit = true;
+            const ca = Math.cos(lz.a), sa = Math.sin(lz.a);
+            for (const e of enemies) {
+              if (e.dead || e.spawnT > 0 || e.ghost || e.kind === 'necessary') continue;
+              const dx = e.x - lz.x, dy = e.y - lz.y;
+              const along = dx * ca + dy * sa, off = Math.abs(-dx * sa + dy * ca);
+              if (along > -e.r && along < L + e.r && off < lz.width / 2 + e.r) damageEnemy(e, lz.dmg, ca * 320, sa * 320, 0);
+            }
+          }
+        } else if (!lz.hit && state === 'wave') {
           const dx = player.x - lz.x, dy = player.y - lz.y;
           const along = dx * Math.cos(lz.a) + dy * Math.sin(lz.a);
           const off = Math.abs(-dx * Math.sin(lz.a) + dy * Math.cos(lz.a));
@@ -1086,7 +1107,7 @@
     let want = mouse.down || keys[' '];
     if (touch.active && weapon === 'shoot') want = !!nearestHostile();
     if (touch.active && weapon === 'swing') { const t = nearestHostile(); want = !!t && hyp(t.x - p.x, t.y - p.y) < BASE.swingRange + t.r; }
-    if (touch.dashReq) { want = weapon === 'dash'; touch.dashReq = false; }
+    if (touch.dashReq) { want = weapon === 'dash' || weapon === 'laser'; touch.dashReq = false; }
     if (want && cds[weapon] <= 0) attack(weapon, ix, iy);
   }
 
@@ -1117,7 +1138,7 @@
         let da = Math.atan2(dy, dx) - a;
         da = Math.atan2(Math.sin(da), Math.cos(da));
         if (Math.abs(da) > BASE.swingArc && d > e.r) continue;
-        damageEnemy(e, dmg * 2.2, dx / (d || 1) * 220, dy / (d || 1) * 220, 0.35);
+        damageEnemy(e, dmg * 4, dx / (d || 1) * 260, dy / (d || 1) * 260, 0.35);
       }
       for (const b of bullets) {
         if (b.from !== 'enemy') continue;
@@ -1127,6 +1148,10 @@
         da = Math.atan2(Math.sin(da), Math.cos(da));
         if (Math.abs(da) <= BASE.swingArc) { b.life = 0; burst(b.x, b.y, b.color || '#e0157a', 2, 60); }
       }
+    } else if (w === 'laser') {
+      cds.laser = PLAYER_LASER_WARN + PLAYER_LASER_CD;
+      lasers.push({ owner: p, mine: true, x: p.x, y: p.y, a: p.angle, warn: PLAYER_LASER_WARN, warnMax: PLAYER_LASER_WARN, active: LASER_ON, dmg: dmg * 9, color: '#4f86f7', width: 22, hit: false });
+      sfx(520, 0.3, 'sine', 0.035, 600);
     } else if (w === 'dash') {
       cds.dash = BASE.dashCd;
       p.dashVx = Math.cos(p.angle) * BASE.dashSpeed;
@@ -1533,17 +1558,6 @@
     ctx.globalAlpha = 1;
     if (e.ghost) return;
 
-    const label = e.kind === 'boss' ? `${e.name} @ ${e.domain}` : `${e.name} ${e.domain}`;
-    const fs = e.kind === 'boss' ? 10 : 8;
-    ctx.font = `${fs}px Silkscreen, monospace`;
-    const tw = Math.ceil(ctx.measureText(label).width) + 6;
-    const ty = Math.round(e.y - size / 2 - (e.kind === 'boss' ? 14 : 10));
-    ctx.fillStyle = TAG_COLORS[e.kind];
-    ctx.globalAlpha = 0.85;
-    ctx.fillRect(Math.round(e.x - tw / 2), ty - fs / 2 - 2, tw, fs + 3);
-    ctx.globalAlpha = 1;
-    text(label, Math.round(e.x), ty, fs, '#fff');
-
     if (e.hp < e.maxHp) {
       const bw = e.kind === 'boss' ? 120 : Math.max(24, size);
       const by = Math.round(e.y + size / 2 + 4);
@@ -1554,13 +1568,23 @@
     }
   }
 
-  const CURSOR = [[0, 0], [0, 17], [4, 13], [7, 20], [10, 19], [7, 12], [12, 12]];
+  const CURSORS = [
+    { pts: [[0, 0], [0, 17], [4, 13], [7, 20], [10, 19], [7, 12], [12, 12]], cracks: [] },
+    { pts: [[0, 0], [0, 17], [4, 13], [7, 20], [10, 19], [7, 12], [12, 12], [9.6, 9.6], [8.8, 10.5], [8.2, 8.2]], cracks: [[[8.8, 10.5], [7.2, 11.1]]] },
+    { pts: [[0, 0], [0, 6], [1.3, 7.1], [0, 8.3], [0, 17], [4, 13], [7, 20], [8, 19.7], [8.6, 18.6], [9.2, 19.3], [10, 19], [7, 12], [12, 12], [9.6, 9.6], [8.8, 10.5], [8.2, 8.2]], cracks: [[[8.8, 10.5], [6.6, 11.3]], [[1.3, 7.1], [3, 6.9]]] },
+    { pts: [[0, 2.4], [0, 6], [1.3, 7.1], [0, 8.3], [0, 17], [1.4, 15.6], [2.3, 14.4], [2.8, 14.2], [4, 13], [7, 20], [8, 19.7], [8.6, 18.6], [9.2, 19.3], [10, 19], [7, 12], [12, 12], [9.6, 9.6], [8.8, 10.5], [8.2, 8.2], [2.4, 2.4], [1.2, 1.5]], cracks: [[[8.8, 10.5], [5.8, 11.6]], [[1.3, 7.1], [3.4, 6.6]], [[1.2, 1.5], [2, 4.2]], [[2.3, 14.4], [2.4, 12.6]]] }
+  ];
+  const CURSOR = CURSORS[0].pts;
+  const cursorStage = () => {
+    const pct = player ? player.hp / player.maxHp : 1;
+    return pct <= 0.25 ? 3 : pct <= 0.5 ? 2 : pct <= 0.75 ? 1 : 0;
+  };
   const CURSOR_CENTER = [4, 10];
   const CURSOR_ANGLE = Math.atan2(-CURSOR_CENTER[1], -CURSOR_CENTER[0]);
 
-  function cursorPath() {
+  function cursorPath(pts = CURSOR) {
     ctx.beginPath();
-    CURSOR.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
     ctx.closePath();
   }
 
@@ -1627,14 +1651,18 @@
     }
   }
 
+  function laserLength(lz) {
+    return lz.mine ? hyp(W, H) * 1.2 : rayLength(lz.x, lz.y, lz.a);
+  }
+
   function drawLasers() {
     for (const lz of lasers) {
-      const L = rayLength(lz.x, lz.y, lz.a);
+      const L = laserLength(lz);
       const ex = lz.x + Math.cos(lz.a) * L, ey = lz.y + Math.sin(lz.a) * L;
       ctx.save();
       ctx.lineCap = 'round';
       if (lz.warn > 0) {
-        const k = 1 - lz.warn / LASER_WARN;
+        const k = 1 - lz.warn / (lz.warnMax || LASER_WARN);
         const blink = lz.warn < 0.5 ? (Math.floor(lz.warn * 16) % 2 ? 1 : 0.35) : 0.55 + Math.sin(k * 30) * 0.2;
         ctx.globalAlpha = (0.25 + k * 0.6) * blink;
         ctx.strokeStyle = lz.color;
@@ -1709,6 +1737,14 @@
     if (state === 'dead') return;
     if (p.inv > 0 && p.dashT <= 0 && state === 'wave' && Math.floor(p.inv * 20) % 2) return;
     const moving = hyp(p.vx, p.vy) > 30;
+    const cur = CURSORS[cursorStage()];
+    ctx.save();
+    const pulse = 0.75 + Math.sin(fxT * 5) * 0.15;
+    ctx.globalAlpha = 0.45 * pulse;
+    drawGlow(p.x, p.y, 44, '#2f6fff');
+    ctx.globalAlpha = 0.8 * pulse;
+    drawGlow(p.x, p.y, 20, '#9cc0ff');
+    ctx.restore();
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.angle - CURSOR_ANGLE);
@@ -1719,13 +1755,19 @@
       const fl = rand(3, 7);
       ctx.fillRect(7, 20, 3, fl);
     }
-    cursorPath();
+    cursorPath(cur.pts);
     ctx.fillStyle = p.dashT > 0 ? '#dfe9ff' : '#fff';
     ctx.fill();
     ctx.lineWidth = 1.4;
     ctx.lineJoin = 'miter';
     ctx.strokeStyle = '#000';
     ctx.stroke();
+    if (cur.cracks.length) {
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      for (const [[x1, y1], [x2, y2]] of cur.cracks) { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -1758,18 +1800,11 @@
     const pad = 10;
     const bw = 150;
     ctx.fillStyle = 'rgba(255,255,255,.85)';
-    ctx.fillRect(pad - 4, pad + 22, bw + 70, 40);
+    ctx.fillRect(pad - 4, pad + 22, bw + 70, 20);
     ctx.strokeStyle = '#9fb3d3';
-    ctx.strokeRect(pad - 3.5, pad + 22.5, bw + 69, 39);
+    ctx.strokeRect(pad - 3.5, pad + 22.5, bw + 69, 19);
     text(`WAVE ${wave}`, pad + 2, pad + 32, 10, '#1851ce', 'left');
     text(`SCORE ${score}`, pad + bw + 62, pad + 32, 8, '#444', 'right');
-    const pct = clamp(player.hp / player.maxHp, 0, 1);
-    ctx.fillStyle = '#ddd';
-    ctx.fillRect(pad + 2, pad + 44, bw, 10);
-    const segs = Math.floor(bw / 6);
-    ctx.fillStyle = pct < 0.3 ? '#d8402a' : '#3fbf3f';
-    for (let i = 0; i < segs * pct; i++) ctx.fillRect(pad + 3 + i * 6, pad + 45, 5, 8);
-    text(`${Math.ceil(player.hp)}/${player.maxHp}`, pad + bw + 8, pad + 49, 8, '#333', 'left');
     ctx.globalAlpha = 1;
   }
 
@@ -1811,7 +1846,7 @@
     ctx.save();
     for (const lz of lasers) {
       if (lz.warn > 0) continue;
-      const L = rayLength(lz.x, lz.y, lz.a);
+      const L = laserLength(lz);
       ctx.globalAlpha = 0.16 * (lz.active / LASER_ON) + 0.05;
       for (let d = 0; d <= L; d += 50) drawGlow(lz.x + Math.cos(lz.a) * d, lz.y + Math.sin(lz.a) * d, 70, lz.color);
     }

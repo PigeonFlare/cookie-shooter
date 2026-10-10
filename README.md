@@ -1,4 +1,4 @@
-# Cookie Banner
+# Site Attack
 
 Every cookie a page tries to load is an enemy. You are the mouse cursor, flying around a 2009-era copy of Chrome opened to google.com, and your job is to delete the trackers before they delete you.
 
@@ -11,13 +11,15 @@ Every cookie a page tries to load is an enemy. You are the mouse cursor, flying 
 | WASD / arrow keys | Fly |
 | Mouse | Aim |
 | Click / Space | Use your current attack |
-| 1 / 2 / 3 | Switch to swing, shoot or dash (or tap the buttons) |
+| 1 / 2 / 3 / 4 | Switch to swing, shoot, laser or dash (or tap the buttons) |
 | Enter | Start the next wave |
 | Esc | Open the extension menu (pauses) |
 
-Swing hits everything in an arc in front of you and cuts through enemy bullets. Shoot fires big blue bolts. Dash is a quick invulnerable burst in the direction your cursor is pointing that damages every cookie you pass through (necessary ones included, so watch out), with a short cooldown.
+Swing hits everything in an arc in front of you and cuts through enemy bullets. Shoot fires big blue bolts. Laser charges for 1 second, showing where it will fire, then blasts a beam that pierces every enemy in its path; it has a 5 second cooldown. Dash is a quick invulnerable burst in the direction your cursor is pointing that damages every cookie you pass through (necessary ones included, so watch out), with a short cooldown.
 
-On a phone, touch and drag to fly. Swing and shoot auto-target the nearest tracker; with dash selected, each new tap dashes toward your finger.
+There's no health bar. Your cursor glows so you can spot it in a crowd, and it gets more chipped and cracked as your health drops to 75%, 50% and 25%.
+
+On a phone, touch and drag to fly. Swing and shoot auto-target the nearest tracker; with laser or dash selected, each new tap fires the laser or dashes toward your finger.
 
 ## The cookies
 
@@ -34,7 +36,7 @@ The Google logo letters, search box, buttons and links in the middle of the page
 
 ## The extension menu
 
-Click the cookie icon next to the address bar to open Cookie Crusher. From there you can start the next wave, save your progress (kept in your browser's local storage, so it survives a reload), load your save, or "clear browsing data" to start over.
+Click the cookie icon next to the address bar to open Site Attack. From there you can start the next wave, save your progress (kept in your browser's local storage, so it survives a reload), load your save, or "clear browsing data" to start over.
 
 ## Chrome extension
 
