@@ -54,7 +54,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     h('span', { class: 'key', text: key }), h('canvas'), h('span', { class: 'wname', text: name }), h('span', { class: 'cd' }));
   root.append(
     h('canvas', { class: 'game' }),
-    h('div', { class: 'weapons' }, wbtn('swing', '1', 'Swing'), wbtn('shoot', '2', 'Shoot', true), wbtn('laser', '3', 'Laser'), wbtn('dash', '4', 'Dash')),
+    h('div', { class: 'weapons' }, wbtn('swing', '1', 'Swing'), wbtn('shoot', '2', 'Shoot', true), wbtn('dash', '3', 'Dash')),
     h('div', { class: 'panel hidden' }, h('h2'), h('p'), h('div', { class: 'btns' }), h('div', { class: 'hint' }))
   );
   const canvas = root.querySelector('canvas.game');
@@ -219,14 +219,6 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       '....DLLLD',
       'K....DDD.',
       '.........'] },
-    laser: { pal: { W: '#ffffff', B: '#4f86f7', D: '#1851ce' }, rows: [
-      '.........',
-      'DD.......',
-      'DBBBBBBBB',
-      'DBWWWWWWW',
-      'DBBBBBBBB',
-      'DD.......',
-      '.........'] },
     dash: { pal: { B: '#1851ce', L: '#7fa7ff' }, rows: [
       'L...B....',
       'LL..BB...',
@@ -273,8 +265,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     for (const k in weaponBtns) weaponBtns[k].classList.toggle('active', k === w);
   }
 
-  const PLAYER_LASER_WARN = 1, PLAYER_LASER_CD = 5;
-  const CD_MAX = { swing: 0.42, shoot: 0.16, laser: PLAYER_LASER_WARN + PLAYER_LASER_CD, dash: 0.9 };
+  const CD_MAX = { swing: 0.42, shoot: 0.16, dash: 0.9 };
 
   function updateWeaponUi() {
     for (const k in weaponBtns) {
@@ -297,7 +288,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     fireInterval: 0.16,
     bulletSpeed: 540,
     swingCd: 0.42,
-    swingRange: 80,
+    swingRange: 100,
     swingArc: 1.05,
     dashCd: 0.9,
     dashTime: 0.17,
@@ -315,7 +306,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
   let shake = 0, flashRed = 0, flashes = [], rings = [], hitStop = 0, whiteFlash = 0, fxT = 0;
   let idleHintT = 0;
   let weapon = 'shoot';
-  const cds = { swing: 0, shoot: 0, laser: 0, dash: 0 };
+  const cds = { swing: 0, shoot: 0, dash: 0 };
   let slashes = [], ghosts = [], lasers = [];
   let swingDir = 1;
 
@@ -349,7 +340,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
   const mouse = { x: 0, y: 0, down: false, inside: false };
   const touch = { active: false, x: 0, y: 0, dashReq: false };
 
-  const GAME_KEYS = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', '1', '2', '3', '4', 'enter', 'n', 'escape', 'p']);
+  const GAME_KEYS = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', '1', '2', '3', 'enter', 'n', 'escape', 'p']);
   window.addEventListener('keydown', e => {
     const k = (e.key || '').toLowerCase();
     if (!GAME_KEYS.has(k)) return;
@@ -361,8 +352,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     if ((k === 'enter' || k === 'n') && state === 'idle') startWave();
     if (k === '1') setWeapon('swing');
     if (k === '2') setWeapon('shoot');
-    if (k === '3') setWeapon('laser');
-    if (k === '4') setWeapon('dash');
+    if (k === '3') setWeapon('dash');
   }, { capture: true, signal: ac.signal });
   window.addEventListener('keyup', e => {
     const k = (e.key || '').toLowerCase();
@@ -396,7 +386,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     if (paused) { togglePause(); return; }
     const p = canvasPos(e.touches[0]);
     touch.active = true; touch.x = p.x; touch.y = p.y;
-    if (weapon === 'dash' || weapon === 'laser') touch.dashReq = true;
+    if (weapon === 'dash') touch.dashReq = true;
   }, { passive: false });
   canvas.addEventListener('touchmove', e => {
     e.preventDefault();
@@ -1255,7 +1245,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     for (const f of floaters) { f.life -= dt; f.y -= (f.big ? 8 : 26) * dt; }
     for (const sl of slashes) { sl.life -= dt; sl.x = player.x; sl.y = player.y; }
     for (const lz of lasers) {
-      if (lz.owner && !lz.owner.dead && lz.warn > 0) { lz.x = lz.owner.x; lz.y = lz.owner.y; if (lz.mine) lz.a = lz.owner.angle; }
+      if (lz.owner && !lz.owner.dead && lz.warn > 0) { lz.x = lz.owner.x; lz.y = lz.owner.y; }
       if (lz.owner && lz.owner.dead && lz.warn > 0) lz.gone = true;
       if (paused || (state !== 'wave' && state !== 'idle')) continue;
       if (lz.warn > 0) {
@@ -1269,20 +1259,9 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       } else {
         lz.active -= dt;
         shake = Math.max(shake, 4);
-        const L = laserLength(lz);
+        const L = rayLength(lz.x, lz.y, lz.a);
         if (Math.random() < 0.8) sparks(lz.x + Math.cos(lz.a) * L, lz.y + Math.sin(lz.a) * L, Math.random() < 0.5 ? '#ffffff' : lz.color, 2, lz.a + Math.PI, 1.2, 300);
-        if (lz.mine) {
-          if (!lz.hit) {
-            lz.hit = true;
-            const ca = Math.cos(lz.a), sa = Math.sin(lz.a);
-            for (const e of enemies) {
-              if (e.dead || e.spawnT > 0 || e.ghost || e.kind === 'necessary') continue;
-              const dx = e.x - lz.x, dy = e.y - lz.y;
-              const along = dx * ca + dy * sa, off = Math.abs(-dx * sa + dy * ca);
-              if (along > -e.r && along < L + e.r && off < lz.width / 2 + e.r) damageEnemy(e, lz.dmg, ca * 320, sa * 320, 0);
-            }
-          }
-        } else if (!lz.hit && state === 'wave') {
+        if (!lz.hit && state === 'wave') {
           const dx = player.x - lz.x, dy = player.y - lz.y;
           const along = dx * Math.cos(lz.a) + dy * Math.sin(lz.a);
           const off = Math.abs(-dx * Math.sin(lz.a) + dy * Math.cos(lz.a));
@@ -1420,7 +1399,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     let want = mouse.down || keys[' '];
     if (touch.active && weapon === 'shoot') want = !!nearestHostile();
     if (touch.active && weapon === 'swing') { const t = nearestHostile(); want = !!t && hyp(t.x - p.x, t.y - p.y) < BASE.swingRange + t.r; }
-    if (touch.dashReq) { want = weapon === 'dash' || weapon === 'laser'; touch.dashReq = false; }
+    if (touch.dashReq) { want = weapon === 'dash'; touch.dashReq = false; }
     if (want && cds[weapon] <= 0) attack(weapon, ix, iy);
   }
 
@@ -1461,10 +1440,6 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
         da = Math.atan2(Math.sin(da), Math.cos(da));
         if (Math.abs(da) <= BASE.swingArc) { b.life = 0; burst(b.x, b.y, b.color || '#e0157a', 2, 60); }
       }
-    } else if (w === 'laser') {
-      cds.laser = PLAYER_LASER_WARN + PLAYER_LASER_CD;
-      lasers.push({ owner: p, mine: true, x: p.x, y: p.y, a: p.angle, warn: PLAYER_LASER_WARN, warnMax: PLAYER_LASER_WARN, active: LASER_ON, dmg: dmg * 9, color: '#4f86f7', width: 22, hit: false });
-      sfx(520, 0.3, 'sine', 0.035, 600);
     } else if (w === 'dash') {
       cds.dash = BASE.dashCd;
       p.dashVx = Math.cos(p.angle) * BASE.dashSpeed;
@@ -1999,25 +1974,21 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       ctx.save();
       ctx.translate(Math.round(sl.x), Math.round(sl.y));
       ctx.rotate(cur);
-      const sc = 3;
+      const sc = 3 * BASE.swingRange / 80;
       ctx.drawImage(SWORD, 6, -Math.floor(SWORD.height * sc / 2), SWORD.width * sc, SWORD.height * sc);
       ctx.restore();
       ctx.globalAlpha = 1;
     }
   }
 
-  function laserLength(lz) {
-    return lz.mine ? hyp(W, H) * 1.2 : rayLength(lz.x, lz.y, lz.a);
-  }
-
   function drawLasers() {
     for (const lz of lasers) {
-      const L = laserLength(lz);
+      const L = rayLength(lz.x, lz.y, lz.a);
       const ex = lz.x + Math.cos(lz.a) * L, ey = lz.y + Math.sin(lz.a) * L;
       ctx.save();
       ctx.lineCap = 'round';
       if (lz.warn > 0) {
-        const k = 1 - lz.warn / (lz.warnMax || LASER_WARN);
+        const k = 1 - lz.warn / LASER_WARN;
         const blink = lz.warn < 0.5 ? (Math.floor(lz.warn * 16) % 2 ? 1 : 0.35) : 0.55 + Math.sin(k * 30) * 0.2;
         ctx.globalAlpha = (0.25 + k * 0.6) * blink;
         ctx.strokeStyle = lz.color;
@@ -2201,7 +2172,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     ctx.save();
     for (const lz of lasers) {
       if (lz.warn > 0) continue;
-      const L = laserLength(lz);
+      const L = rayLength(lz.x, lz.y, lz.a);
       ctx.globalAlpha = 0.16 * (lz.active / LASER_ON) + 0.05;
       for (let d = 0; d <= L; d += 50) drawGlow(lz.x + Math.cos(lz.a) * d, lz.y + Math.sin(lz.a) * d, 70, lz.color);
     }
