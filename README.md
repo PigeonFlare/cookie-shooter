@@ -2,7 +2,7 @@
 
 Every cookie a page tries to load is an enemy. You are the mouse cursor, flying around a 2009-era copy of Chrome opened to google.com, and your job is to delete the trackers before they delete you.
 
-**Play:** https://pigeonflare.github.io/cookie-shooter/
+**Play:** https://pigeonflare.github.io/site-attack/
 
 ## How to play
 
