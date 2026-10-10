@@ -969,6 +969,7 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
       firstHalf = elementSpecs.filter(sp => sp.el.isConnected).map(sp => ({ ...sp }));
       spawnQueue = [];
       countdown = 3;
+      fireTokens = 1;
       spawnTimer = 0;
       state = 'wave';
       paused = false;
@@ -1068,13 +1069,13 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
 
   function spawnElement(spec) {
     const el = spec.el, r = el.getBoundingClientRect();
-    const nerf = spec.kind === 'shooter' ? Math.max(1, spec.shooters / 4) : spec.kind === 'boss' ? Math.max(1, spec.count / 8) : 1;
+    const nerf = spec.kind === 'boss' ? Math.max(1, spec.count / 8) : 1;
     const hw = r.width / 2, hh = r.height / 2;
     const boss = spec.kind === 'boss';
     const e = {
       kind: spec.kind, el, name: elementLabel(el), domain: '', x: r.left + hw, y: r.top + hh, homeX: r.left + hw, homeY: r.top + hh,
       hw, hh, r: Math.max(10, Math.min(Math.max(hw, hh), Math.min(hw, hh) * 1.6 + 6)), scale: 3, vx: 0, vy: 0,
-      spawnT: 0.75, hitFlash: 0, contactCd: 0, wanderA: rand(0, Math.PI * 2), t: 0, nerf, preClone: spec.clone || null,
+      spawnT: 0.75, hitFlash: 0, contactCd: 0, diveT: 0, wanderA: rand(0, Math.PI * 2), t: 0, nerf, preClone: spec.clone || null,
       shots: 0, shotT: 0, spinA: rand(0, 6.3), orbitA: rand(0, 6.3), orbitDir: Math.random() < 0.5 ? 1 : -1
     };
     if (boss) {
@@ -1242,6 +1243,9 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
 
   function update(dt) {
     if (hitStop > 0) { hitStop -= dt; dt *= 0.12; }
+    if (mode === 'elements' && state === 'wave' && !paused) fireTokens = Math.min(FIRE_RATE[difficulty], fireTokens + FIRE_RATE[difficulty] * dt);
+    fireGate = Infinity;
+    for (const e of enemies) if (e.el && e.kind === 'shooter' && !e.dead && e.shots <= 0 && e.fireCd < fireGate) fireGate = e.fireCd;
     for (const f of floaters) { f.life -= dt; f.y -= (f.big ? 8 : 26) * dt; }
     for (const sl of slashes) { sl.life -= dt; sl.x = player.x; sl.y = player.y; }
     for (const lz of lasers) {
@@ -1633,24 +1637,55 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
         const wide = W >= H;
         const qx = wide && p.x >= W / 2 ? W / 2 : 0, qy = !wide && p.y >= H / 2 ? H / 2 : 0;
         const qw = wide ? W / 2 : W, qh = wide ? H : H / 2, pad = e.r + 10;
-        e.orbitA += dt * e.orbitDir * 0.5;
-        if (Math.random() < dt * 0.3) e.orbitDir = -e.orbitDir;
-        const fx = e.aimLead ? p.x + p.vx * 0.5 : p.x, fy = e.aimLead ? p.y + p.vy * 0.5 : p.y;
-        let gx = clamp(fx + Math.cos(e.orbitA) * e.keep, qx + pad, qx + qw - pad);
-        let gy = clamp(fy + Math.sin(e.orbitA) * e.keep, qy + pad, qy + qh - pad);
-        if (hyp(gx - p.x, gy - p.y) < e.keep * 0.7) {
-          gx = p.x - qx < qw / 2 ? qx + qw - pad : qx + pad;
-          gy = p.y - qy < qh / 2 ? qy + qh - pad : qy + pad;
+        let gx, gy, sp, diving = false;
+        if (e.el) {
+          e.diveCd = (e.diveCd ?? rand(4, 12)) - dt;
+          if (e.diveCd <= 0 && e.diveT <= 0 && d > e.keep * 0.5) { e.diveT = rand(1.2, 1.8); e.diveCd = rand(8, 14); }
+          if (e.diveT > 0) {
+            e.diveT -= dt;
+            diving = true;
+            gx = p.x + p.vx * 0.4; gy = p.y + p.vy * 0.4;
+            sp = e.speed * 1.15;
+          } else {
+            e.anchorT = (e.anchorT || 0) - dt;
+            const a = e.anchor;
+            const stale = !a || e.anchorT <= 0 || a.x < qx || a.x > qx + qw || a.y < qy || a.y > qy + qh || hyp(a.x - p.x, a.y - p.y) < e.keep * 0.6;
+            if (stale) {
+              let best = null, bestScore = -Infinity;
+              for (let i = 0; i < 8; i++) {
+                const c = { x: rand(qx + pad, qx + qw - pad), y: rand(qy + pad, qy + qh - pad) };
+                const cd = hyp(c.x - p.x, c.y - p.y);
+                const score = -Math.abs(cd - e.keep) - (cd < e.keep * 0.7 ? 400 : 0);
+                if (score > bestScore) { bestScore = score; best = c; }
+              }
+              e.anchor = best;
+              e.anchorT = rand(2.5, 5);
+            }
+            gx = e.anchor.x; gy = e.anchor.y;
+          }
+        } else {
+          e.orbitA += dt * e.orbitDir * 0.5;
+          if (Math.random() < dt * 0.3) e.orbitDir = -e.orbitDir;
+          const fx = e.aimLead ? p.x + p.vx * 0.5 : p.x, fy = e.aimLead ? p.y + p.vy * 0.5 : p.y;
+          gx = clamp(fx + Math.cos(e.orbitA) * e.keep, qx + pad, qx + qw - pad);
+          gy = clamp(fy + Math.sin(e.orbitA) * e.keep, qy + pad, qy + qh - pad);
+          if (hyp(gx - p.x, gy - p.y) < e.keep * 0.7) {
+            gx = p.x - qx < qw / 2 ? qx + qw - pad : qx + pad;
+            gy = p.y - qy < qh / 2 ? qy + qh - pad : qy + pad;
+          }
         }
         const ox = gx - e.x, oy = gy - e.y, od = hyp(ox, oy) || 1;
-        const sp = Math.min(e.speed, od * 3);
+        sp = Math.min(sp || e.speed, od * 3);
         tvx = ox / od * sp; tvy = oy / od * sp;
-        if (d < e.keep * 0.6) { tvx -= nx * e.speed; tvy -= ny * e.speed; }
-        steer = 3;
+        if (!diving && d < e.keep * 0.6) { tvx -= nx * e.speed; tvy -= ny * e.speed; }
+        steer = diving ? 2.4 : 3;
         if (lasers.some(lz => lz.owner === e)) { tvx *= 0.15; tvy *= 0.15; }
         shooterStream(e, dt);
         e.fireCd -= dt;
-        if (e.fireCd <= 0 && e.shots <= 0) { shooterFire(e, aim); if (e.nerf) e.fireCd *= e.nerf; }
+        if (e.fireCd <= 0 && e.shots <= 0 && (!e.el || (fireTokens >= 1 && e.fireCd <= fireGate + 0.25))) {
+          if (e.el) fireTokens -= 1;
+          shooterFire(e, aim);
+        }
       } else if (e.kind === 'boss') {
         const aim = Math.atan2(dy, dx);
         const rage = e.hp < e.maxHp * 0.4 ? 1.35 : 1;
@@ -2112,28 +2147,6 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     ctx.drawImage(img, Math.round(pu.x - w / 2), Math.round(y - h / 2), w, h);
   }
 
-  function hudBlocked() {
-    const x0 = 0, y0 = 20, x1 = 250, y1 = 90;
-    const near = (x, y, r) => x + r > x0 && x - r < x1 && y + r > y0 && y - r < y1;
-    if (player && near(player.x, player.y, player.r)) return true;
-    return enemies.some(e => near(e.x, e.y, e.r + 14));
-  }
-
-  let hudAlpha = 1;
-  function drawHud() {
-    hudAlpha += ((hudBlocked() ? 0.25 : 1) - hudAlpha) * 0.2;
-    ctx.globalAlpha = hudAlpha;
-    const pad = 10;
-    const bw = 150;
-    ctx.fillStyle = 'rgba(255,255,255,.85)';
-    ctx.fillRect(pad - 4, pad + 22, bw + 70, 20);
-    ctx.strokeStyle = '#9fb3d3';
-    ctx.strokeRect(pad - 3.5, pad + 22.5, bw + 69, 19);
-    text(`WAVE ${wave}`, pad + 2, pad + 32, 10, '#1851ce', 'left');
-    text(`SCORE ${score}`, pad + bw + 62, pad + 32, 8, '#444', 'right');
-    ctx.globalAlpha = 1;
-  }
-
   const glowCache = new Map();
   function hexRgb(c) {
     let m = /^#([0-9a-f]{6})$/i.exec(c);
@@ -2295,7 +2308,6 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     if (shake > 0 && !reducedMotion) ctx.translate(rand(-shake, shake) * 0.5, rand(-shake, shake) * 0.5);
 
     drawLighting();
-    drawHud();
 
     for (const pu of powerups) drawPowerup(pu);
     for (const e of enemies) if (e.kind === 'necessary') drawEnemy(e);
@@ -2416,6 +2428,8 @@ font: 12px/1.45 Tahoma, Verdana, sans-serif; color: #111; background: #fff; bord
     return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && getComputedStyle(document.documentElement).colorScheme.includes('dark'));
   }
 
+  const FIRE_RATE = { easy: 3, medium: 4.5, hard: 6 };
+  let fireTokens = 1, fireGate = Infinity;
   const DIFF_MAX = { easy: 10, medium: 30, hard: deviceCap() };
 
   function deviceCap() {

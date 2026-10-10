@@ -1757,28 +1757,6 @@
     ctx.drawImage(img, Math.round(pu.x - w / 2), Math.round(y - h / 2), w, h);
   }
 
-  function hudBlocked() {
-    const x0 = 0, y0 = 20, x1 = 250, y1 = 90;
-    const near = (x, y, r) => x + r > x0 && x - r < x1 && y + r > y0 && y - r < y1;
-    if (player && near(player.x, player.y, player.r)) return true;
-    return enemies.some(e => near(e.x, e.y, e.r + 14));
-  }
-
-  let hudAlpha = 1;
-  function drawHud() {
-    hudAlpha += ((hudBlocked() ? 0.25 : 1) - hudAlpha) * 0.2;
-    ctx.globalAlpha = hudAlpha;
-    const pad = 10;
-    const bw = 150;
-    ctx.fillStyle = 'rgba(255,255,255,.85)';
-    ctx.fillRect(pad - 4, pad + 22, bw + 70, 20);
-    ctx.strokeStyle = '#9fb3d3';
-    ctx.strokeRect(pad - 3.5, pad + 22.5, bw + 69, 19);
-    text(`WAVE ${wave}`, pad + 2, pad + 32, 10, '#1851ce', 'left');
-    text(`SCORE ${score}`, pad + bw + 62, pad + 32, 8, '#444', 'right');
-    ctx.globalAlpha = 1;
-  }
-
   const glowCache = new Map();
   function hexRgb(c) {
     let m = /^#([0-9a-f]{6})$/i.exec(c);
@@ -1939,7 +1917,6 @@
     if (shake > 0) ctx.translate(rand(-shake, shake) * 0.5, rand(-shake, shake) * 0.5);
 
     drawLighting();
-    drawHud();
 
     for (const pu of powerups) drawPowerup(pu);
     for (const e of enemies) if (e.kind === 'necessary') drawEnemy(e);
